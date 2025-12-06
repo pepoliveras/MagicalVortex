@@ -10,35 +10,37 @@ export type PlayerId = 'PLAYER' | 'AI';
 
 /**
  * FINITE STATE MACHINE (FSM)
- * Defines the specific phase or moment the game is in.
- * This controls what UI elements are interactive and what logic runs.
+ * Replaced 'enum' with 'const object' to satisfy erasableSyntaxOnly settings.
+ * This acts exactly like the enum but is safer for modern bundlers.
  */
-export enum FsmState {
-  INIT = 'INIT', // Initial load
-  PLAYER_CHOSE_CHAR = 'PLAYER_CHOSE_CHAR', // Character selection screen
-  START_GAME = 'START_GAME', // Setup (dealing hands)
-  START_TURN = 'START_TURN', // Resetting turn counters
-  DRAW_PHASE = 'DRAW_PHASE', // Player drawing cards
-  MAIN_PHASE = 'MAIN_PHASE', // Main interaction phase (Play cards, abilities, attack)
+export const FsmState = {
+  INIT: 'INIT', // Initial load
+  PLAYER_CHOSE_CHAR: 'PLAYER_CHOSE_CHAR', // Character selection screen
+  START_GAME: 'START_GAME', // Setup (dealing hands)
+  START_TURN: 'START_TURN', // Resetting turn counters
+  DRAW_PHASE: 'DRAW_PHASE', // Player drawing cards
+  MAIN_PHASE: 'MAIN_PHASE', // Main interaction phase (Play cards, abilities, attack)
   
   // Combat Phases
-  AWAITING_AI_DEFENSE = 'AWAITING_AI_DEFENSE', // Player attacked, AI thinking
-  AWAITING_PLAYER_DEFENSE = 'AWAITING_PLAYER_DEFENSE', // AI attacked, Player selects defense
-  RESOLVE_DIRECT_COMBAT = 'RESOLVE_DIRECT_COMBAT', // Calculating math for standard combat
-  RESOLVE_VORTEX_COMBAT = 'RESOLVE_VORTEX_COMBAT', // Calculating math for vortex interactions
+  AWAITING_AI_DEFENSE: 'AWAITING_AI_DEFENSE', // Player attacked, AI thinking
+  AWAITING_PLAYER_DEFENSE: 'AWAITING_PLAYER_DEFENSE', // AI attacked, Player selects defense
+  RESOLVE_DIRECT_COMBAT: 'RESOLVE_DIRECT_COMBAT', // Calculating math for standard combat
+  RESOLVE_VORTEX_COMBAT: 'RESOLVE_VORTEX_COMBAT', // Calculating math for vortex interactions
   
   // Ability Interaction Phases (Cost Payment)
-  SELECT_DISCARD_FOR_ABILITY = 'SELECT_DISCARD_FOR_ABILITY', // Discarding to play a card from hand
-  SELECT_DISCARD_FOR_HEAL = 'SELECT_DISCARD_FOR_HEAL', // Discarding for Affinity/Healing
-  SELECT_DISCARD_FOR_MIND = 'SELECT_DISCARD_FOR_MIND', // Discarding for Mind Control
-  SELECT_DISCARD_FOR_MODIFICATION = 'SELECT_DISCARD_FOR_MODIFICATION', // Discarding for Elemental/Magic/Master Control
-  SELECT_TARGET_FOR_MODIFICATION = 'SELECT_TARGET_FOR_MODIFICATION', // Choosing the card to modify after paying cost
-  SELECT_DISCARD_FOR_WALL = 'SELECT_DISCARD_FOR_WALL', // Discarding to activate Magic Wall from active bar
+  SELECT_DISCARD_FOR_ABILITY: 'SELECT_DISCARD_FOR_ABILITY', // Discarding to play a card from hand
+  SELECT_DISCARD_FOR_HEAL: 'SELECT_DISCARD_FOR_HEAL', // Discarding for Affinity/Healing
+  SELECT_DISCARD_FOR_MIND: 'SELECT_DISCARD_FOR_MIND', // Discarding for Mind Control
+  SELECT_DISCARD_FOR_MODIFICATION: 'SELECT_DISCARD_FOR_MODIFICATION', // Discarding for Elemental/Magic/Master Control
+  SELECT_TARGET_FOR_MODIFICATION: 'SELECT_TARGET_FOR_MODIFICATION', // Choosing the card to modify after paying cost
+  SELECT_DISCARD_FOR_WALL: 'SELECT_DISCARD_FOR_WALL', // Discarding to activate Magic Wall from active bar
   
-  SHOWDOWN = 'SHOWDOWN', // 3-second delay to reveal cards before cleanup
-  AI_TURN_LOGIC = 'AI_TURN_LOGIC', // AI processing its turn
-  GAME_OVER = 'GAME_OVER' // End screen
-}
+  SHOWDOWN: 'SHOWDOWN', // 3-second delay to reveal cards before cleanup
+  AI_TURN_LOGIC: 'AI_TURN_LOGIC', // AI processing its turn
+  GAME_OVER: 'GAME_OVER' // End screen
+} as const;
+
+export type FsmState = typeof FsmState[keyof typeof FsmState];
 
 // Data model for a playable card (Attack or Defense)
 export interface Card {

@@ -1,5 +1,5 @@
 
-import { Card, Player, AbilityCard } from '../types';
+import type { Card, Player } from '../types';
 
 interface DamageResult {
   damage: number;

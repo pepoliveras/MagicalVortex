@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useCallback, useReducer } from 'react';
-import { GameState, FsmState, Card, PlayerId, AbilityCard, Character } from './types';
-import { createInitialState, generateDeck, generateAbilityDeck, MAX_HAND_SIZE, shuffle, CHARACTERS, getAbilityByTag } from './constants';
+import React, { useState, useEffect } from 'react';
+import { FsmState } from './types';
+import type { GameState, Card, PlayerId, AbilityCard, Character } from './types';
+import { createInitialState, MAX_HAND_SIZE, shuffle, CHARACTERS, getAbilityByTag } from './constants';
 import { calculateDirectDamage, calculateVortexDamage, getMaxLife } from './utils/gameLogic';
 import GameBoard from './components/GameBoard';
 import GameLog from './components/GameLog';

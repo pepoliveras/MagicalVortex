@@ -1,5 +1,6 @@
 
-import { Card, AbilityCard, GameState, FsmState, Character } from './types';
+import { FsmState } from './types';
+import type { Card, AbilityCard, GameState, Character } from './types';
 
 export const INITIAL_LIFE = 40;
 export const MAX_HAND_SIZE = 5;

@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Player, Card, AbilityCard, FsmState, PendingAction, Character } from '../types';
+import { FsmState } from '../types';
+import type { Player, Card, AbilityCard, PendingAction, Character } from '../types';
 import CardComponent from './CardComponent';
 
 interface GameBoardProps {
@@ -204,14 +205,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
         <div className="flex gap-4 mt-2">
             
             {/* Player Stats & Active Abilities - Organized to act as a control panel */}
-            <div className="flex flex-col gap-2 w-1/4 min-w-[160px]">
+            <div className="flex flex-col gap-2 w-32 md:w-48 lg:w-32 min-w-[160px]">
                  <div className="flex gap-2">
                     <StatBadge label="Life" value={player.life} color="border-green-500 text-green-400" />
                     <StatBadge label="Level" value={player.level} color="border-yellow-500 text-yellow-400" />
                  </div>
                  
                  {/* Active Abilities Grid */}
-                 <div className="flex flex-col gap-1.5 mt-1 overflow-y-auto max-h-[140px] pr-1">
+                 <div className="flex flex-col gap-1.5 mt-1 overflow-y-auto max-h-[140px] pr-1 scrollbar-thin scrollbar-thumb-slate-700">
                     {player.activeAbilities.length === 0 && <span className="text-xs text-slate-500 text-center italic mt-2">No active effects</span>}
                     
                     {player.permanentShield && (
