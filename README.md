@@ -111,10 +111,9 @@ Black Affinity Skills
 
 🛠️ Technology Stack
 
-* Frontend: [e.g., React / Vue / Angular]
-* Styling: [e.g., CSS3 / Tailwind / SASS]
-* Logic: [e.g., TypeScript / JavaScript ES6+]
-* Build Tool: [e.g., Vite / Webpack]
+* Frontend: React
+* Styling: CSS3 / Tailwind
+* Logic: TypeScript
 
 🚀 Installation & Setup
 
@@ -128,7 +127,7 @@ Black Affinity Skills
 	npm install
 
 4. Run the local server:
-	npm start
+	npm run build
 
 📜 License
 
