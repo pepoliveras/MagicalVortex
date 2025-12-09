@@ -17,31 +17,31 @@ The Objective
 
 The deck consists of White and Black cards, divided into two types:
 
-	* Attack (Lightning symbol)
-	* Defense (Shield symbol)
-	* Values: Range from 1 to 10.
+* Attack (Lightning symbol)
+* Defense (Shield symbol)
+* Values: Range from 1 to 10.
 
 ⚔️ Combat Logic
 
 The core of the duel lies in color interaction:
 
-	* Opposite Colors (Black vs. White): Simple subtraction.Damage = Attack Value - Defense Value
-	* Same Color (Clash): The defense is penetrated more easily.Damage = Attack Value - (Defense Value / 2)
-	* Reflect: If the resulting damage calculation is negative, the damage bounces back to the attacker!
+* Opposite Colors (Black vs. White): Simple subtraction.Damage = Attack Value - Defense Value
+* Same Color (Clash): The defense is penetrated more easily.Damage = Attack Value - (Defense Value / 2)
+* Reflect: If the resulting damage calculation is negative, the damage bounces back to the attacker!
 
 🌀 The Vortex System
 
 The center of the board features 4 dynamic cards that form The Vortex. Players can use these to augment their Attack or Defense.
 
-	* Same Color: Adds power to your card.
-	* Different Color: Subtracts power from your card.
-	* Instability: If the calculation results in a negative number, it causes Instability Damage directly to the player using the Vortex.
+* Same Color: Adds power to your card.
+* Different Color: Subtracts power from your card.
+* Instability: If the calculation results in a negative number, it causes Instability Damage directly to the player using the Vortex.
 
 🆙 Leveling Up
 
 Players can discard cards from their hand that sum up to a value of 10 or more to Level Up (Max Level 3).
 
-	* Benefits: Increases maximum hand size [MAX Cards + Lvl], increases Max HP [MAX HP + Lvl*10], allows more attacks per turn, and unlocks superior abilities.
+* Benefits: Increases maximum hand size [MAX Cards + Lvl], increases Max HP [MAX HP + Lvl*10], allows more attacks per turn, and unlocks superior abilities.
 
 🧙‍♂️ Characters & Classes
 
@@ -79,55 +79,55 @@ Choose from 12 unique avatars, each belonging to a specific habitat and possessi
 
 Players acquire abilities by discarding a card.
 
-	* White/Black Characters: Max Abilities = Level + 1.
-	* Neutral Characters: Max Abilities = Level.
+* White/Black Characters: Max Abilities = Level + 1.
+* Neutral Characters: Max Abilities = Level.
 
 Neutral Skills (Universal)
 
-	* Magic Wall (Lvl I, Active): Discard a card to generate a permanent shield (Value = Card Discarded). The Wall takes damage before HP. It cannot be replaced until destroyed.
-	* Magic Affinity (Lvl I, Active): Heals HP [Card Value / 2 + Level].
-	* Magic Vision (Lvl I, Active): Reveal an opponent's entire hand.
-	* Mind Control (Lvl II, Active): Forces opponent to discard cards equal to your Level.
-	* Elemental Control (Lvl II, Active): Change the Color of one of your own cards [□ ◄ ► ■].
-	* Magic Control (Lvl II, Active): Change the Type of one of your own cards [ATK ◄ ► DEF].
-	* Vortex Control (Lvl II, Passive): Allows using the Vortex for Defense once per turn.
-	* Master Control (Lvl III, Active): Change both Color AND Type of a card.
-	* Master Affinity (Lvl III, Active): Recover HP equal to the full value of the discarded card.
-	* Master Vortex (Lvl III, Passive): Removes the "once per turn" limit on Vortex usage during attacks.
+* Magic Wall (Lvl I, Active): Discard a card to generate a permanent shield (Value = Card Discarded). The Wall takes damage before HP. It cannot be replaced until destroyed.
+* Magic Affinity (Lvl I, Active): Heals HP [Card Value / 2 + Level].
+* Magic Vision (Lvl I, Active): Reveal an opponent's entire hand.
+* Mind Control (Lvl II, Active): Forces opponent to discard cards equal to your Level.
+* Elemental Control (Lvl II, Active): Change the Color of one of your own cards [□ ◄ ► ■].
+* Magic Control (Lvl II, Active): Change the Type of one of your own cards [ATK ◄ ► DEF].
+* Vortex Control (Lvl II, Passive): Allows using the Vortex for Defense once per turn.
+* Master Control (Lvl III, Active): Change both Color AND Type of a card.
+* Master Affinity (Lvl III, Active): Recover HP equal to the full value of the discarded card.
+* Master Vortex (Lvl III, Passive): Removes the "once per turn" limit on Vortex usage during attacks.
 
 White Affinity Skills
 
-	* Light Defense (Lvl I, Passive): Increment White Defense cards by [+1 per Level].
-	* Paladin of Light (Lvl I, Passive): Increment White Attack cards by [+1 per Level].
-	* Light Affinity (Lvl II, Active): Discard White card to heal [Card Value / 2 + Level].
-	* Acolyte of Light (Lvl III, Passive): Halves all incoming White damage (rounded down).
+* Light Defense (Lvl I, Passive): Increment White Defense cards by [+1 per Level].
+* Paladin of Light (Lvl I, Passive): Increment White Attack cards by [+1 per Level].
+* Light Affinity (Lvl II, Active): Discard White card to heal [Card Value / 2 + Level].
+* Acolyte of Light (Lvl III, Passive): Halves all incoming White damage (rounded down).
 
 Black Affinity Skills
 
-	* Dark Defense (Lvl I, Passive): Increment Black Defense cards by [+1 per Level].
-	* Dark Lord (Lvl I, Passive): Increment Black Attack cards by [+1 per Level].
-	* Dark Affinity (Lvl II, Active): Discard Black card to heal [Card Value / 2 + Level].
-	* Dark Servant (Lvl III, Passive): Halves all incoming Black damage (rounded down).
+* Dark Defense (Lvl I, Passive): Increment Black Defense cards by [+1 per Level].
+* Dark Lord (Lvl I, Passive): Increment Black Attack cards by [+1 per Level].
+* Dark Affinity (Lvl II, Active): Discard Black card to heal [Card Value / 2 + Level].
+* Dark Servant (Lvl III, Passive): Halves all incoming Black damage (rounded down).
 
 🛠️ Technology Stack
 
-	* Frontend: [e.g., React / Vue / Angular]
-	* Styling: [e.g., CSS3 / Tailwind / SASS]
-	* Logic: [e.g., TypeScript / JavaScript ES6+]
-	* Build Tool: [e.g., Vite / Webpack]
+* Frontend: [e.g., React / Vue / Angular]
+* Styling: [e.g., CSS3 / Tailwind / SASS]
+* Logic: [e.g., TypeScript / JavaScript ES6+]
+* Build Tool: [e.g., Vite / Webpack]
 
 🚀 Installation & Setup
 
-	1. Clone the repository:
+1. Clone the repository:
 	git clone [https://github.com/yourusername/vortex-duel.git](https://github.com/yourusername/vortex-duel.git)
 
-	2. Navigate to the project directory:
+2. Navigate to the project directory:
 	cd vortex-duel
 
-	3. Install dependencies:
+3. Install dependencies:
 	npm install
 
-	4. Run the local server:
+4. Run the local server:
 	npm start
 
 📜 License
