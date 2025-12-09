@@ -119,10 +119,10 @@ Black Affinity Skills
 🚀 Installation & Setup
 
 1. Clone the repository:
-	git clone [https://github.com/yourusername/vortex-duel.git](https://github.com/yourusername/vortex-duel.git)
+	git clone ...
 
 2. Navigate to the project directory:
-	cd vortex-duel
+	cd ...
 
 3. Install dependencies:
 	npm install
