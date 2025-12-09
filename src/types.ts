@@ -38,7 +38,8 @@ export const FsmState = {
   SELECT_DISCARD_FOR_MODIFICATION: 'SELECT_DISCARD_FOR_MODIFICATION', // Discarding for Elemental/Magic/Master Control
   SELECT_TARGET_FOR_MODIFICATION: 'SELECT_TARGET_FOR_MODIFICATION', // Choosing the card to modify after paying cost
   SELECT_DISCARD_FOR_WALL: 'SELECT_DISCARD_FOR_WALL', // Discarding to activate Magic Wall from active bar
-  
+  SELECT_DISCARD_FOR_VISION: 'SELECT_DISCARD_FOR_VISION', // NEW: Discarding to activate Magic Vision
+
   // Generic Actions
   SELECT_DISCARD_GENERIC: 'SELECT_DISCARD_GENERIC', // NEW: Generic discard action
   
@@ -47,6 +48,7 @@ export const FsmState = {
 
   SHOWDOWN: 'SHOWDOWN', // 3-second delay to reveal cards before cleanup
   AI_TURN_LOGIC: 'AI_TURN_LOGIC', // AI processing its turn
+  ROUND_TRANSITION: 'ROUND_TRANSITION', // NEW: Between rounds
   GAME_OVER: 'GAME_OVER' // End screen
 } as const;
 
@@ -67,6 +69,7 @@ export interface AbilityCard {
   level: number;
   description: string;
   effectTag: string; // Used for logic identification (e.g., 'MAGIC_WALL')
+  affinity: 'WHITE' | 'BLACK' | 'NEUTRAL'; // NEW: V2.0 Affinity
 }
 
 // Data model for Characters
@@ -90,6 +93,7 @@ export interface Player {
   activeAbilities: AbilityCard[]; // Abilities currently in play (Passive or Active)
   permanentShield: { value: number } | null; // Magic Wall state
   levelUpProgress: number; 
+  isHandRevealed: boolean; // NEW: V2.0 Magic Vision Active State
   
   // Turn Constraints & Counters
   usedAbilitiesThisTurn: string[]; // IDs of abilities used (to prevent spam)
@@ -117,6 +121,7 @@ export interface GameState {
   fsmState: FsmState;
   currentPlayer: PlayerId;
   winner: PlayerId | null;
+  round: number; // NEW: 1, 2, or 3
   
   players: {
     PLAYER: Player;

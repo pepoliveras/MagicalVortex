@@ -1,10 +1,9 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { FsmState } from './types';
 import type { GameState, Card, PlayerId, AbilityCard, Character, Language } from './types';
 import { createInitialState, MAX_HAND_SIZE, shuffle, CHARACTERS, getAbilityByTag } from './constants';
 import { calculateDirectDamage, calculateVortexDamage, getMaxLife } from './utils/gameLogic';
+import { getAiLevelUpCards, getAiAbilityDiscard, getAiAttackCard, getAiDefenseCard } from './utils/aiLogic';
 import GameBoard from './components/GameBoard';
 import GameLog from './components/GameLog';
 import EndGameEffects from './components/EndGameEffects';
@@ -38,6 +37,9 @@ const App: React.FC = () => {
   
   // NEW: State for Rules Popup
   const [showRulesModal, setShowRulesModal] = useState(false);
+
+  // NEW: State for Ability Guide Popup
+  const [showAbilityModal, setShowAbilityModal] = useState(false);
   
   // NEW: State for Character Lore Modal
   const [viewingCharacter, setViewingCharacter] = useState<Character | null>(null);
@@ -100,7 +102,12 @@ const App: React.FC = () => {
       setTimeout(() => {
           setGameState(prev => {
               const newPlayer = { ...prev.players.PLAYER };
-              // Re-calculate valid indices
+              const playerAffinity = newPlayer.character?.affinityColor || 'NEUTRAL';
+              
+              // Re-calculate valid indices based on V2.0 Affinity Rules
+              // Neutral Chars -> Any Ability
+              // White Chars -> White or Neutral Ability
+              // Black Chars -> Black or Neutral Ability
               const activeTags = newPlayer.activeAbilities.map(a => a.effectTag);
               const handTags = newPlayer.abilityHand.map(a => a.effectTag);
               
@@ -109,6 +116,12 @@ const App: React.FC = () => {
                     if (c.level > newPlayer.level) return -1;
                     if (activeTags.includes(c.effectTag)) return -1;
                     if (handTags.includes(c.effectTag)) return -1;
+
+                    // Affinity Filter
+                    if (playerAffinity !== 'NEUTRAL') {
+                        if (c.affinity !== 'NEUTRAL' && c.affinity !== playerAffinity) return -1;
+                    }
+
                     return i;
                 })
                 .filter(i => i !== -1);
@@ -140,15 +153,197 @@ const App: React.FC = () => {
       setActiveCardId(null);
   };
 
+  // --- CORE COMBAT & LOGIC FUNCTIONS (Hoisted before useEffect) ---
+
+  const resolveCombat = () => {
+      setGameState(prev => {
+          const pending = prev.pendingAction;
+          const attacker = prev.players[pending.attackerId!];
+          const defender = prev.players[pending.targetId!];
+          let result;
+          if (pending.type === 'VORTEX_ATTACK') {
+               const vIndex = pending.vortexCardIndex!;
+               const vCard = prev.vortexCards[vIndex]!;
+               result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
+          } else {
+              if (pending.vortexDefenseIndex !== null) {
+                  const vCard = prev.vortexCards[pending.vortexDefenseIndex]!;
+                  result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
+                  result.logMessage = txt.logs.vortexDefensePrefix + result.logMessage;
+              } else {
+                  result = calculateDirectDamage(pending.attackingCard!, pending.defendingCard, attacker, defender, language);
+              }
+          }
+          const newPlayers = { ...prev.players };
+          if (result.targetId) {
+              const target = newPlayers[result.targetId];
+              // 1. Update HP
+              target.life = Math.max(0, target.life - result.damage);
+              
+              // 2. Update Shield for the specific target that took damage (could be defender OR attacker on recoil)
+              if (result.shieldRemaining !== undefined && target.permanentShield) {
+                  target.permanentShield.value = result.shieldRemaining;
+              }
+          }
+
+          if (pending.type === 'VORTEX_ATTACK' && pending.attackerId === 'PLAYER') {
+               newPlayers.PLAYER.vortexAttacksPerformed += 1;
+          }
+          return {
+              ...prev, players: newPlayers, gameLog: [...prev.gameLog, result.logMessage], fsmState: FsmState.SHOWDOWN 
+          };
+      });
+  };
+
+  const runAiDefenseLogic = () => {
+      setGameState(prev => {
+          const ai = prev.players.AI;
+          const attackCard = prev.pendingAction.attackingCard!;
+          
+          // Use AI Logic Utils
+          const chosenDef = getAiDefenseCard(ai.powerHand, attackCard, prev.round, prev.players.PLAYER, ai);
+          
+          const logMsg = chosenDef ? txt.logs.defendWith(chosenDef.value, chosenDef.color) : txt.logs.noDef;
+          return {
+              ...prev, gameLog: addLog(prev, `AI: ${logMsg}`),
+              pendingAction: { ...prev.pendingAction, defendingCard: chosenDef },
+              fsmState: FsmState.RESOLVE_DIRECT_COMBAT
+          };
+      });
+      setTimeout(resolveCombat, 1000);
+  };
+
+  const finalizeTurn = () => {
+      if (highlightedAbilityId) setHighlightedAbilityId(null);
+      setGameState(prev => {
+          const pending = prev.pendingAction;
+          const newPlayers = { ...prev.players };
+          let discardUpdate = [...prev.discardPile];
+          let vortexUpdate = [...prev.vortexCards];
+          let powerDeckUpdate = [...prev.powerDeck];
+
+          if (pending.attackerId && pending.attackingCard) {
+              newPlayers[pending.attackerId].powerHand = newPlayers[pending.attackerId].powerHand.filter(c => c.id !== pending.attackingCard?.id);
+              discardUpdate.push(pending.attackingCard);
+          }
+          if (pending.targetId && pending.defendingCard) {
+              newPlayers[pending.targetId].powerHand = newPlayers[pending.targetId].powerHand.filter(c => c.id !== pending.defendingCard?.id);
+              discardUpdate.push(pending.defendingCard);
+          }
+
+          if (pending.vortexCardIndex !== null) {
+              const oldVortex = vortexUpdate[pending.vortexCardIndex];
+              if (oldVortex) discardUpdate.push(oldVortex);
+              const newVortexCard = powerDeckUpdate.length > 0 ? powerDeckUpdate.pop() || null : null;
+              vortexUpdate[pending.vortexCardIndex] = newVortexCard;
+          }
+          if (pending.vortexDefenseIndex !== null) {
+              const oldVortex = vortexUpdate[pending.vortexDefenseIndex];
+              if (oldVortex) discardUpdate.push(oldVortex);
+              const newVortexCard = powerDeckUpdate.length > 0 ? powerDeckUpdate.pop() || null : null;
+              vortexUpdate[pending.vortexDefenseIndex] = newVortexCard;
+          }
+
+          let nextFsm: FsmState;
+          let currentPlayerOverride = prev.currentPlayer;
+
+          if (prev.currentPlayer === 'PLAYER') {
+             const wasVortexAttack = pending.type === 'VORTEX_ATTACK';
+             const hasMasterVortex = newPlayers.PLAYER.activeAbilities.some(a => a.effectTag === 'MASTER_VORTEX');
+             const handEmpty = newPlayers.PLAYER.powerHand.length === 0;
+
+             if ((wasVortexAttack && !hasMasterVortex) || handEmpty) {
+                 nextFsm = FsmState.START_TURN; 
+                 currentPlayerOverride = 'AI';
+             } else {
+                 nextFsm = FsmState.MAIN_PHASE;
+             }
+          } else {
+             nextFsm = FsmState.AI_TURN_LOGIC;
+          }
+          
+          let status: 'PLAYING' | 'GAME_OVER' = 'PLAYING';
+          let log = [...prev.gameLog];
+          let winner: PlayerId | null = prev.winner;
+          
+          // Victory Logic (Round based)
+          if (newPlayers.AI.life <= 0) {
+              if (prev.round < 3) {
+                  // Round Transition
+                  nextFsm = FsmState.ROUND_TRANSITION;
+                  log.push(txt.ui.roundClear);
+              } else {
+                  // Final Victory
+                  status = 'GAME_OVER'; 
+                  nextFsm = FsmState.GAME_OVER; 
+                  winner = 'PLAYER'; 
+                  log.push(txt.ui.finalVictory);
+                  log.push(txt.lore.win);
+              }
+          } else if (newPlayers.PLAYER.life <= 0) {
+              status = 'GAME_OVER'; 
+              nextFsm = FsmState.GAME_OVER; 
+              winner = 'AI'; 
+              log.push(txt.lore.loss);
+          }
+
+          return {
+              ...prev, players: newPlayers, currentPlayer: currentPlayerOverride, winner: winner,
+              discardPile: discardUpdate, vortexCards: vortexUpdate, powerDeck: powerDeckUpdate, gameLog: log,
+              pendingAction: { type: null, attackerId: null, targetId: null, attackingCard: null, defendingCard: null, vortexCardIndex: null, vortexDefenseIndex: null, targetAbility: null },
+              fsmState: nextFsm, gameStatus: status
+          };
+      });
+      // Clear selections on turn transition
+      setActiveCardId(null);
+      setSelectedCardsForLevelUp([]);
+  };
+
   // --- STARTUP LOGIC ---
   const startGame = () => {
-    const freshState = createInitialState();
+    const freshState = createInitialState(1); // Start Round 1
     setGameState({
         ...freshState,
         gameStatus: 'PLAYING',
         fsmState: FsmState.PLAYER_CHOSE_CHAR,
         uiMessage: ui.chooseChar
     });
+  };
+
+  const startNextRound = () => {
+      if (gameState.round >= 3) return;
+      const nextRound = gameState.round + 1;
+      
+      // Preserve character but reset stats for new round
+      const char = gameState.players.PLAYER.character;
+      const freshState = createInitialState(nextRound);
+      
+      setGameState(prev => {
+          if (char) {
+             const playerStartAbility = getAbilityByTag(char.startingAbilityTag)!;
+             freshState.players.PLAYER.character = char;
+             freshState.players.PLAYER.activeAbilities = [playerStartAbility];
+             if (char.startingAbilityTag === 'MAGIC_KNOWLEDGE') {
+                 freshState.players.PLAYER.maxHandSize += 1;
+             }
+             
+             // AI Character Selection
+             const availableChars = CHARACTERS.filter(c => c.id !== char.id);
+             const aiChar = availableChars[Math.floor(Math.random() * availableChars.length)];
+             const aiStartAbility = getAbilityByTag(aiChar.startingAbilityTag)!;
+             freshState.players.AI.character = aiChar;
+             freshState.players.AI.activeAbilities = [aiStartAbility];
+             if (aiChar.startingAbilityTag === 'MAGIC_KNOWLEDGE') {
+                 freshState.players.AI.maxHandSize += 1;
+             }
+          }
+          return {
+              ...freshState,
+              gameStatus: 'PLAYING',
+              fsmState: FsmState.START_GAME,
+              uiMessage: `${ui.round} ${nextRound}`
+          };
+      });
   };
 
   const handleCharacterSelect = (character: Character) => {
@@ -169,7 +364,8 @@ const App: React.FC = () => {
           if (aiChar.startingAbilityTag === 'MAGIC_KNOWLEDGE') {
               newState.players.AI.maxHandSize += 1;
           }
-          newState.fsmState = FsmState.START_GAME;
+          // UPDATED: Show Round 1 Transition Screen first
+          newState.fsmState = FsmState.ROUND_TRANSITION;
           const pName = character.name;
           const aiName = aiChar.name;
           newState.gameLog = addLog(prev, txt.logs.matchStart(pName, aiName));
@@ -227,7 +423,8 @@ const App: React.FC = () => {
                      attacksPerformed: 0,
                      vortexAttacksPerformed: 0,
                      levelUpsPerformed: 0,
-                     abilitiesDrawnThisTurn: 0
+                     abilitiesDrawnThisTurn: 0,
+                     isHandRevealed: false // Reset Magic Vision effect
                  }
              }
           }));
@@ -265,7 +462,13 @@ const App: React.FC = () => {
         case FsmState.AI_TURN_LOGIC:
            setTimeout(() => {
              setGameState(prev => {
-                 const ai = { ...prev.players.AI };
+                 let ai = { ...prev.players.AI };
+                 const round = prev.round;
+                 let newAbilityDeck = [...prev.abilityDeck];
+                 let newDiscardPile = [...prev.discardPile];
+                 let logUpdate = [...prev.gameLog];
+                 
+                 // --- PHASE 0: DRAW IF NEEDED ---
                  if (ai.attacksPerformed === 0) {
                      const deck = [...prev.powerDeck];
                      const needed = ai.maxHandSize - ai.powerHand.length;
@@ -278,44 +481,114 @@ const App: React.FC = () => {
                          };
                      }
                  }
-                 if (ai.attacksPerformed < 2) {
-                     const atkCards = ai.powerHand.filter(c => c.type === 'ATK').sort((a,b) => b.value - a.value);
-                     if (atkCards.length > 0) {
-                         const bestAtk = atkCards[0];
+
+                 // --- PHASE 1: MAIN PHASE ACTIONS (Level Up / Ability) ---
+                 if (ai.attacksPerformed === 0) {
+                     // 1a. Check Level Up
+                     const levelUpCards = getAiLevelUpCards(ai.powerHand, round, ai.level);
+                     if (levelUpCards) {
+                         ai.powerHand = ai.powerHand.filter(c => !levelUpCards.includes(c));
+                         ai.level += 1;
+                         ai.levelUpsPerformed += 1;
+                         if (ai.activeAbilities.some(a => a.effectTag === 'MAGIC_KNOWLEDGE')) ai.maxHandSize += 1;
+                         newDiscardPile = [...newDiscardPile, ...levelUpCards];
+                         logUpdate.push(txt.logs.aiLevelsUp);
+                     }
+
+                     // 1b. Check Ability Draw (Round 3 only)
+                     const discardForAbil = getAiAbilityDiscard(ai.powerHand, round, ai.abilitiesDrawnThisTurn);
+                     if (discardForAbil && newAbilityDeck.length > 0) {
+                        const aiAffinity = ai.character?.affinityColor || 'NEUTRAL';
+                        const activeTags = ai.activeAbilities.map(a => a.effectTag);
+                        const handTags = ai.abilityHand.map(a => a.effectTag);
+                        
+                        const validIndices = newAbilityDeck.map((c, i) => {
+                           if (c.level > ai.level) return -1;
+                           if (activeTags.includes(c.effectTag)) return -1;
+                           if (handTags.includes(c.effectTag)) return -1;
+                           if (aiAffinity !== 'NEUTRAL' && c.affinity !== 'NEUTRAL' && c.affinity !== aiAffinity) return -1;
+                           return i;
+                       }).filter(i => i !== -1);
+
+                       if (validIndices.length > 0) {
+                            const rndIndex = Math.floor(Math.random() * validIndices.length);
+                            const deckIndex = validIndices[rndIndex];
+                            
+                            const newAbility = newAbilityDeck.splice(deckIndex, 1)[0];
+                            ai.powerHand = ai.powerHand.filter(c => c.id !== discardForAbil.id);
+                            ai.abilityHand = [...ai.abilityHand, newAbility];
+                            ai.abilitiesDrawnThisTurn += 1;
+                            newDiscardPile.push(discardForAbil);
+                            logUpdate.push(txt.logs.aiDrawsAbility);
+                       }
+                     }
+                     
+                     // 1c. Play Ability from Hand (If slots available)
+                     // Logic: If AI has passive ability or any ability it can play, play it.
+                     const charAffinity = ai.character?.affinityColor || 'NEUTRAL';
+                     const maxAbs = charAffinity === 'NEUTRAL' ? ai.level : ai.level + 1;
+                     
+                     if (ai.activeAbilities.length < maxAbs && ai.abilityHand.length > 0) {
+                         // Find playable ability
+                         const playable = ai.abilityHand.find(a => a.level <= ai.level);
+                         if (playable) {
+                             ai.abilityHand = ai.abilityHand.filter(a => a.id !== playable.id);
+                             ai.activeAbilities = [...ai.activeAbilities, playable];
+                             if (playable.effectTag === 'MAGIC_KNOWLEDGE') ai.maxHandSize += ai.level;
+                             // Simple log msg for playing ability
+                             logUpdate.push(`${txt.ui.opponent} ${txt.ui.activate}: ${getTransAbility(playable.effectTag, language).name}`);
+                         }
+                     }
+                 }
+
+                 // --- PHASE 2: COMBAT ---
+                 const maxAttacks = 1 + ai.level;
+                 if (ai.attacksPerformed < maxAttacks) {
+                     const attackCard = getAiAttackCard(ai.powerHand, round, ai.attacksPerformed, maxAttacks);
+                     
+                     if (attackCard) {
                          ai.attacksPerformed += 1;
                          const player = prev.players.PLAYER;
                          const playerHasDef = player.powerHand.some(c => c.type === 'DEF');
                          const playerHasVortex = player.activeAbilities.some(a => a.effectTag === 'VORTEX_CONTROL') && player.vortexAttacksPerformed < 1; 
                          const canDefend = playerHasDef || playerHasVortex;
 
-                         if (!canDefend) {
-                             return {
-                                 ...prev,
-                                 players: { ...prev.players, AI: ai },
-                                 fsmState: FsmState.RESOLVE_DIRECT_COMBAT, 
-                                 pendingAction: {
-                                     type: 'DIRECT_ATTACK', attackerId: 'AI', targetId: 'PLAYER',
-                                     attackingCard: bestAtk, defendingCard: null,
-                                     vortexCardIndex: null, vortexDefenseIndex: null, targetAbility: null
-                                 },
-                                 gameLog: addLog(prev, txt.logs.aiAttacks(bestAtk.value, bestAtk.color, ai.attacksPerformed))
-                             };
-                         }
-                         
-                         return {
+                         // Set Pending Action
+                         const newState = {
                              ...prev,
                              players: { ...prev.players, AI: ai },
-                             fsmState: FsmState.AWAITING_PLAYER_DEFENSE,
+                             discardPile: newDiscardPile,
+                             abilityDeck: newAbilityDeck,
+                             gameLog: logUpdate,
                              pendingAction: {
-                                 type: 'DIRECT_ATTACK', attackerId: 'AI', targetId: 'PLAYER',
-                                 attackingCard: bestAtk, defendingCard: null,
+                                 type: 'DIRECT_ATTACK' as const, attackerId: 'AI' as PlayerId, targetId: 'PLAYER' as PlayerId,
+                                 attackingCard: attackCard, defendingCard: null,
                                  vortexCardIndex: null, vortexDefenseIndex: null, targetAbility: null
-                             },
-                             gameLog: addLog(prev, txt.logs.aiAttacks(bestAtk.value, bestAtk.color, ai.attacksPerformed))
+                             }
                          };
+                         
+                         // Append attack log
+                         newState.gameLog.push(txt.logs.aiAttacks(attackCard.value, attackCard.color, ai.attacksPerformed));
+
+                         if (!canDefend) {
+                             return { ...newState, fsmState: FsmState.RESOLVE_DIRECT_COMBAT };
+                         } else {
+                             return { ...newState, fsmState: FsmState.AWAITING_PLAYER_DEFENSE };
+                         }
                      }
                  }
-                 return { ...prev, currentPlayer: 'PLAYER', fsmState: FsmState.START_TURN, gameLog: addLog(prev, txt.logs.aiEnds) };
+                 
+                 // No attacks left or possible -> End Turn
+                 logUpdate.push(txt.logs.aiEnds);
+                 return { 
+                     ...prev, 
+                     currentPlayer: 'PLAYER', 
+                     fsmState: FsmState.START_TURN, 
+                     players: { ...prev.players, AI: ai },
+                     discardPile: newDiscardPile,
+                     abilityDeck: newAbilityDeck,
+                     gameLog: logUpdate
+                 };
              });
            }, 1000);
            break;
@@ -331,6 +604,9 @@ const App: React.FC = () => {
             break;
           
          case FsmState.GAME_OVER:
+            break;
+            
+         case FsmState.ROUND_TRANSITION:
             break;
       }
     };
@@ -485,7 +761,7 @@ const App: React.FC = () => {
         });
         return;
     }
-    // ACTIVE ABILITY: MIND
+    // ACTIVE ABILITY: MIND (UPDATED V2.0: Discard cards = Level)
     if (fsmState === FsmState.SELECT_DISCARD_FOR_MIND && owner === 'PLAYER') {
         const ability = pendingAction.targetAbility;
         if (!ability) return;
@@ -496,7 +772,10 @@ const App: React.FC = () => {
             player.powerHand = player.powerHand.filter(c => c.id !== card.id);
             const discards = [...prev.discardPile, card];
             player.usedAbilitiesThisTurn = [...player.usedAbilitiesThisTurn, ability.id];
-            const discardCount = Math.floor(card.value / 2);
+            
+            // V2.0 Change: Discards equal to Player Level
+            const discardCount = player.level;
+            
             let aiDiscardedCount = 0;
             if (discardCount > 0 && ai.powerHand.length > 0) {
                  for (let i = 0; i < discardCount; i++) {
@@ -515,6 +794,26 @@ const App: React.FC = () => {
         });
         return;
     }
+    // ACTIVE ABILITY: VISION (NEW V2.0)
+    if (fsmState === FsmState.SELECT_DISCARD_FOR_VISION && owner === 'PLAYER') {
+        const ability = pendingAction.targetAbility;
+        if (!ability) return;
+        const abTrans = getTransAbility(ability.effectTag, language);
+        setGameState(prev => {
+            const player = { ...prev.players.PLAYER };
+            player.powerHand = player.powerHand.filter(c => c.id !== card.id);
+            const discards = [...prev.discardPile, card];
+            player.usedAbilitiesThisTurn = [...player.usedAbilitiesThisTurn, ability.id];
+            player.isHandRevealed = true; // Reveal opponent hand for this turn
+            return {
+                ...prev, players: { ...prev.players, PLAYER: player }, discardPile: discards, fsmState: FsmState.MAIN_PHASE,
+                pendingAction: { ...prev.pendingAction, targetAbility: null },
+                gameLog: addLog(prev, `${txt.logs.discardToAct(card.value, abTrans.name)} ${txt.logs.visionActivated}`)
+            };
+        });
+        return;
+    }
+
     // ACTIVE ABILITY: MOD 1
     if (fsmState === FsmState.SELECT_DISCARD_FOR_MODIFICATION && owner === 'PLAYER') {
          const ability = pendingAction.targetAbility;
@@ -605,11 +904,24 @@ const App: React.FC = () => {
       const abTrans = getTransAbility(ability.effectTag, language);
       if (gameState.players.PLAYER.level < ability.level) { alert(txt.warnings?.levelTooLow); return; }
 
-      // CHECK LIMIT
-      const maxAbilities = gameState.players.PLAYER.level + 1;
+      // CHECK LIMIT V2.0:
+      // Neutral Char = Level
+      // White/Black Char = Level + 1
+      const charAffinity = gameState.players.PLAYER.character?.affinityColor || 'NEUTRAL';
+      const maxAbilities = charAffinity === 'NEUTRAL' ? gameState.players.PLAYER.level : gameState.players.PLAYER.level + 1;
+      
       if (gameState.players.PLAYER.activeAbilities.length >= maxAbilities) {
           alert(txt.warnings?.abilityLimitReached);
           return;
+      }
+
+      // CHECK AFFINITY V2.0:
+      if (charAffinity !== 'NEUTRAL') {
+          // If character is White/Black, they can use Neutral OR their own color
+          if (ability.affinity !== 'NEUTRAL' && ability.affinity !== charAffinity) {
+              alert(txt.warnings?.wrongAffinity);
+              return;
+          }
       }
 
       const isDuplicate = gameState.players.PLAYER.activeAbilities.some(a => a.effectTag === ability.effectTag);
@@ -643,6 +955,9 @@ const App: React.FC = () => {
       else if (['MAGIC_AFFINITY', 'LIGHT_AFFINITY', 'DARK_AFFINITY', 'MASTER_AFFINITY'].includes(ability.effectTag)) {
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_HEAL, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
+      else if (ability.effectTag === 'MAGIC_VISION') {
+          setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_VISION, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
+      }
       else if (ability.effectTag === 'MIND_CONTROL') {
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_MIND, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
@@ -657,8 +972,10 @@ const App: React.FC = () => {
       if (gameState.players.PLAYER.powerHand.length === 0) return;
       if (gameState.players.PLAYER.abilitiesDrawnThisTurn >= 1) { alert(txt.warnings?.drawLimit); return; }
 
-      // CHECK LIMIT
-      const maxAbilities = gameState.players.PLAYER.level + 1;
+      // CHECK LIMIT V2.0
+      const charAffinity = gameState.players.PLAYER.character?.affinityColor || 'NEUTRAL';
+      const maxAbilities = charAffinity === 'NEUTRAL' ? gameState.players.PLAYER.level : gameState.players.PLAYER.level + 1;
+
       if (gameState.players.PLAYER.activeAbilities.length >= maxAbilities) { alert(txt.warnings?.abilityLimitReached); return; }
       
       const player = gameState.players.PLAYER;
@@ -668,6 +985,12 @@ const App: React.FC = () => {
             if (c.level > player.level) return -1;
             if (activeTags.includes(c.effectTag)) return -1;
             if (handTags.includes(c.effectTag)) return -1;
+
+            // Affinity Filter
+            if (charAffinity !== 'NEUTRAL') {
+                if (c.affinity !== 'NEUTRAL' && c.affinity !== charAffinity) return -1;
+            }
+
             return i;
         }).filter(i => i !== -1);
 
@@ -800,136 +1123,10 @@ const App: React.FC = () => {
       }
   };
 
-  const runAiDefenseLogic = () => {
-      setGameState(prev => {
-          const ai = prev.players.AI;
-          const attackCard = prev.pendingAction.attackingCard!;
-          let chosenDef: Card | null = null;
-          const defCards = ai.powerHand.filter(c => c.type === 'DEF');
-          if (defCards.length > 0) {
-              const opposite = defCards.find(c => c.color !== attackCard.color);
-              chosenDef = opposite || defCards[0];
-          }
-          const logMsg = chosenDef ? txt.logs.defendWith(chosenDef.value, chosenDef.color) : txt.logs.noDef;
-          return {
-              ...prev, gameLog: addLog(prev, `AI: ${logMsg}`),
-              pendingAction: { ...prev.pendingAction, defendingCard: chosenDef },
-              fsmState: FsmState.RESOLVE_DIRECT_COMBAT
-          };
-      });
-      setTimeout(resolveCombat, 1000);
-  };
-
-  const resolveCombat = () => {
-      setGameState(prev => {
-          const pending = prev.pendingAction;
-          const attacker = prev.players[pending.attackerId!];
-          const defender = prev.players[pending.targetId!];
-          let result;
-          if (pending.type === 'VORTEX_ATTACK') {
-               const vIndex = pending.vortexCardIndex!;
-               const vCard = prev.vortexCards[vIndex]!;
-               result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
-          } else {
-              if (pending.vortexDefenseIndex !== null) {
-                  const vCard = prev.vortexCards[pending.vortexDefenseIndex]!;
-                  result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
-                  result.logMessage = txt.logs.vortexDefensePrefix + result.logMessage;
-              } else {
-                  result = calculateDirectDamage(pending.attackingCard!, pending.defendingCard, attacker, defender, language);
-              }
-          }
-          const newPlayers = { ...prev.players };
-          if (result.targetId) {
-              const target = newPlayers[result.targetId];
-              target.life = Math.max(0, target.life - result.damage);
-          }
-          if (result.shieldRemaining !== undefined && pending.targetId) {
-             const def = newPlayers[pending.targetId];
-             if (def.permanentShield) def.permanentShield.value = result.shieldRemaining;
-          }
-          if (pending.type === 'VORTEX_ATTACK' && pending.attackerId === 'PLAYER') {
-               newPlayers.PLAYER.vortexAttacksPerformed += 1;
-          }
-          return {
-              ...prev, players: newPlayers, gameLog: [...prev.gameLog, result.logMessage], fsmState: FsmState.SHOWDOWN 
-          };
-      });
-  };
-
-  const finalizeTurn = () => {
-      if (highlightedAbilityId) setHighlightedAbilityId(null);
-      setGameState(prev => {
-          const pending = prev.pendingAction;
-          const newPlayers = { ...prev.players };
-          let discardUpdate = [...prev.discardPile];
-          let vortexUpdate = [...prev.vortexCards];
-          let powerDeckUpdate = [...prev.powerDeck];
-
-          if (pending.attackerId && pending.attackingCard) {
-              newPlayers[pending.attackerId].powerHand = newPlayers[pending.attackerId].powerHand.filter(c => c.id !== pending.attackingCard?.id);
-              discardUpdate.push(pending.attackingCard);
-          }
-          if (pending.targetId && pending.defendingCard) {
-              newPlayers[pending.targetId].powerHand = newPlayers[pending.targetId].powerHand.filter(c => c.id !== pending.defendingCard?.id);
-              discardUpdate.push(pending.defendingCard);
-          }
-
-          if (pending.vortexCardIndex !== null) {
-              const oldVortex = vortexUpdate[pending.vortexCardIndex];
-              if (oldVortex) discardUpdate.push(oldVortex);
-              const newVortexCard = powerDeckUpdate.length > 0 ? powerDeckUpdate.pop() || null : null;
-              vortexUpdate[pending.vortexCardIndex] = newVortexCard;
-          }
-          if (pending.vortexDefenseIndex !== null) {
-              const oldVortex = vortexUpdate[pending.vortexDefenseIndex];
-              if (oldVortex) discardUpdate.push(oldVortex);
-              const newVortexCard = powerDeckUpdate.length > 0 ? powerDeckUpdate.pop() || null : null;
-              vortexUpdate[pending.vortexDefenseIndex] = newVortexCard;
-          }
-
-          let nextFsm: FsmState;
-          let currentPlayerOverride = prev.currentPlayer;
-
-          if (prev.currentPlayer === 'PLAYER') {
-             const wasVortexAttack = pending.type === 'VORTEX_ATTACK';
-             const hasMasterVortex = newPlayers.PLAYER.activeAbilities.some(a => a.effectTag === 'MASTER_VORTEX');
-             const handEmpty = newPlayers.PLAYER.powerHand.length === 0;
-
-             if ((wasVortexAttack && !hasMasterVortex) || handEmpty) {
-                 nextFsm = FsmState.START_TURN; 
-                 currentPlayerOverride = 'AI';
-             } else {
-                 nextFsm = FsmState.MAIN_PHASE;
-             }
-          } else {
-             nextFsm = FsmState.AI_TURN_LOGIC;
-          }
-          
-          let status: 'PLAYING' | 'GAME_OVER' = 'PLAYING';
-          let log = [...prev.gameLog];
-          let winner: PlayerId | null = prev.winner;
-
-          if (newPlayers.PLAYER.life <= 0) {
-              status = 'GAME_OVER'; nextFsm = FsmState.GAME_OVER; winner = 'AI'; log.push(txt.lore.loss);
-          } else if (newPlayers.AI.life <= 0) {
-              status = 'GAME_OVER'; nextFsm = FsmState.GAME_OVER; winner = 'PLAYER'; log.push(txt.lore.win);
-          }
-
-          return {
-              ...prev, players: newPlayers, currentPlayer: currentPlayerOverride, winner: winner,
-              discardPile: discardUpdate, vortexCards: vortexUpdate, powerDeck: powerDeckUpdate, gameLog: log,
-              pendingAction: { type: null, attackerId: null, targetId: null, attackingCard: null, defendingCard: null, vortexCardIndex: null, vortexDefenseIndex: null, targetAbility: null },
-              fsmState: nextFsm, gameStatus: status
-          };
-      });
-      // Clear selections on turn transition
-      setActiveCardId(null);
-      setSelectedCardsForLevelUp([]);
-  };
-
   const validTargetIds = selectedCardsForLevelUp;
-  const isAbilityFull = gameState.players.PLAYER.activeAbilities.length >= gameState.players.PLAYER.level + 1;
+  const charAffinity = gameState.players.PLAYER.character?.affinityColor || 'NEUTRAL';
+  const maxAbilities = charAffinity === 'NEUTRAL' ? gameState.players.PLAYER.level : gameState.players.PLAYER.level + 1;
+  const isAbilityFull = gameState.players.PLAYER.activeAbilities.length >= maxAbilities;
 
   // --- RENDER ---
   return (
@@ -946,6 +1143,41 @@ const App: React.FC = () => {
                     <p className="mb-2">{txt.lore.p1}</p><p className="mb-2">{txt.lore.p2}</p><p>{txt.lore.p3}</p>
                 </div>
                 <div className="mt-6 text-center"><button onClick={() => setShowHistoryModal(false)} className="px-4 py-2 bg-purple-900 hover:bg-purple-800 text-purple-100 rounded border border-purple-500">{ui.closeHistory}</button></div>
+            </div>
+        </div>
+      )}
+
+      {showAbilityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 overflow-y-auto">
+             <div className="bg-slate-900 border-2 border-indigo-600 rounded-xl p-6 max-w-4xl w-full shadow-2xl relative my-8 h-[80vh] overflow-hidden flex flex-col">
+                <button onClick={() => setShowAbilityModal(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
+                <h3 className="text-3xl font-cinzel text-indigo-400 mb-4 text-center border-b border-indigo-900 pb-2 shrink-0">{ui.abilityGuide}</h3>
+                
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                    {/* Neutral */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                        <h4 className="text-slate-200 font-bold mb-3 uppercase tracking-wider border-b border-slate-600 pb-1">{txt.abilityDefinitions.neutral.title}</h4>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                            {txt.abilityDefinitions.neutral.list.map((desc, i) => <li key={i}>• {desc}</li>)}
+                        </ul>
+                    </div>
+                    {/* White */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-yellow-200/20">
+                        <h4 className="text-yellow-200 font-bold mb-3 uppercase tracking-wider border-b border-yellow-900/30 pb-1">{txt.abilityDefinitions.white.title}</h4>
+                        <ul className="space-y-2 text-sm text-yellow-100/80">
+                            {txt.abilityDefinitions.white.list.map((desc, i) => <li key={i}>• {desc}</li>)}
+                        </ul>
+                    </div>
+                    {/* Black */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-purple-900/50">
+                        <h4 className="text-purple-400 font-bold mb-3 uppercase tracking-wider border-b border-purple-900/30 pb-1">{txt.abilityDefinitions.black.title}</h4>
+                        <ul className="space-y-2 text-sm text-purple-300/80">
+                            {txt.abilityDefinitions.black.list.map((desc, i) => <li key={i}>• {desc}</li>)}
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="mt-4 text-center shrink-0"><button onClick={() => setShowAbilityModal(false)} className="px-6 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 rounded border border-indigo-500 font-bold">{ui.closeGuide}</button></div>
             </div>
         </div>
       )}
@@ -1031,28 +1263,29 @@ const App: React.FC = () => {
         <div className="text-sm text-slate-400">{gameState.uiMessage}</div>
       </header>
 
-      <main className="h-full p-2 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-4 z-10 overflow-hidden">
+      {/* MAIN GAME LAYOUT GRID */}
+      <main className="h-full p-2 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-4 z-10 overflow-hidden">
+        
+        {/* LEFT COLUMN: GAME BOARD (PANELS 1, 2, 3) & ACTIONS (PANEL 4) */}
         <div className="lg:col-span-3 flex flex-col gap-4 h-full overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent pr-1">
             
             {gameState.gameStatus === 'PRE_GAME' && (
                 <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-xl border border-slate-700 p-4">
                     <div className="text-center max-w-2xl flex flex-col items-center">
                         <h2 className="text-5xl font-cinzel text-purple-400 mb-6 drop-shadow-lg">{ui.enterVortex}</h2>
-                        
-                        {/* Lore Box */}
                         <div className="bg-slate-900/80 p-6 rounded-lg border border-purple-500/30 shadow-inner mb-8 max-w-lg">
                             <p className="text-slate-300 font-serif italic text-sm leading-relaxed mb-2">{txt.lore.p1}</p>
                             <p className="text-slate-400 font-serif italic text-xs">{txt.lore.p3}</p>
                         </div>
-
                         <div className="flex gap-4 mb-6">
                             <button onClick={() => setLanguage('en')} className={`text-2xl hover:scale-125 transition-transform ${language === 'en' ? 'scale-125' : 'opacity-50'}`}>ENG</button>
                             <button onClick={() => setLanguage('es')} className={`text-2xl hover:scale-125 transition-transform ${language === 'es' ? 'scale-125' : 'opacity-50'}`}>ESP</button>
                             <button onClick={() => setLanguage('ca')} className={`text-2xl hover:scale-125 transition-transform ${language === 'ca' ? 'scale-125' : 'opacity-50'}`}>CAT</button>
                         </div>
-                        <div className="flex gap-4">
+                        <div className="flex gap-4 flex-wrap justify-center">
                             <button onClick={startGame} className="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white font-bold py-4 px-10 rounded-lg shadow-xl border border-purple-400 transition-all transform hover:scale-105">{ui.startGame}</button>
                             <button onClick={() => setShowRulesModal(true)} className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-4 px-6 rounded-lg shadow-lg border border-slate-500 transition-all">{ui.readRules}</button>
+                            <button onClick={() => setShowAbilityModal(true)} className="bg-indigo-900/80 hover:bg-indigo-800 text-indigo-100 font-bold py-4 px-6 rounded-lg shadow-lg border border-indigo-500 transition-all">{ui.abilityGuide}</button>
                         </div>
                     </div>
                 </div>
@@ -1096,7 +1329,42 @@ const App: React.FC = () => {
                  </div>
             )}
 
-            {gameState.gameStatus === 'PLAYING' && gameState.fsmState !== FsmState.PLAYER_CHOSE_CHAR && (
+            {/* ROUND TRANSITION SCREEN */}
+            {gameState.fsmState === FsmState.ROUND_TRANSITION && (
+                 <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-xl border border-slate-700 relative z-20">
+                    <div className="text-center p-8 bg-slate-900/80 backdrop-blur-md rounded-xl border border-orange-500 shadow-2xl">
+                        {/* Check if it's start of game (Round 1, AI has life) or End of Round (AI dead) */}
+                        {gameState.round === 1 && gameState.players.AI.life > 0 ? (
+                           <>
+                                <h2 className="text-5xl font-cinzel mb-4 text-orange-400">{ui.enterVortex}</h2>
+                                <div className="text-3xl font-bold mb-2 text-white">
+                                    {ui.round} 1
+                                </div>
+                                <div className="text-xl text-orange-200 mb-6 font-cinzel tracking-widest border-b border-orange-500/30 pb-2 inline-block px-8">
+                                     {ui.levelBeg}
+                                </div>
+                                <p className="text-slate-300 mb-8 text-sm italic max-w-lg mx-auto leading-relaxed">{txt.lore.p2}</p>
+                                <button 
+                                    onClick={() => setGameState(prev => ({ ...prev, fsmState: FsmState.START_GAME }))} 
+                                    className="bg-orange-700 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg border border-orange-500 transition-all hover:scale-105"
+                                >
+                                    {ui.confirm}
+                                </button>
+                           </>
+                        ) : (
+                           <>
+                                <h2 className="text-5xl font-cinzel mb-4 text-orange-400">{ui.roundClear}</h2>
+                                <p className="text-slate-300 mb-6 text-sm">{ui.roundDesc}</p>
+                                <div className="text-3xl font-bold mb-8 text-white">{ui.round} {gameState.round} ➔ {gameState.round + 1}</div>
+                                <button onClick={startNextRound} className="bg-orange-700 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg border border-orange-500 transition-all">{ui.nextRound}</button>
+                           </>
+                        )}
+                    </div>
+                 </div>
+            )}
+
+            {/* GAME BOARD (PANELS 1, 2, 3) */}
+            {gameState.gameStatus === 'PLAYING' && gameState.fsmState !== FsmState.PLAYER_CHOSE_CHAR && gameState.fsmState !== FsmState.ROUND_TRANSITION && (
                 <GameBoard 
                     ai={gameState.players.AI}
                     player={gameState.players.PLAYER}
@@ -1113,99 +1381,115 @@ const App: React.FC = () => {
                     validTargetIds={validTargetIds}
                     language={language}
                     highlightedAbilityId={highlightedAbilityId}
+                    round={gameState.round}
                 />
             )}
             
-            {gameState.gameStatus === 'PLAYING' && gameState.fsmState !== FsmState.PLAYER_CHOSE_CHAR && (
-                <div className="p-4 bg-slate-800 rounded-xl border border-slate-700 flex gap-4 items-center min-h-[80px] flex-wrap">
-                    <div className="text-slate-400 text-sm font-mono mr-auto w-full lg:w-auto mb-2 lg:mb-0">
-                        {gameState.fsmState === FsmState.SHOWDOWN ? txt.ui.combatResolved : 
-                         gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW ? txt.warnings?.selectDiscardForDraw :
-                         gameState.fsmState === FsmState.SELECT_CARDS_FOR_LEVEL_UP ? txt.warnings?.selectCardsForLevelUp :
-                         gameState.fsmState === FsmState.SELECT_ATTACK_CARD ? txt.warnings?.selectAttackToExec :
-                         gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC ? txt.warnings?.selectDiscardGeneric :
-                         gameState.pendingAction.attackingCard ? `${txt.ui.attackWith} ${gameState.pendingAction.attackingCard.value}` : 
-                         ui.waiting}
-                    </div>
-                     
-                     {/* Buttons for Level Up Confirmation */}
-                     {gameState.fsmState === FsmState.SELECT_CARDS_FOR_LEVEL_UP && (
-                        <>
-                            <div className="text-yellow-400 font-mono text-sm mr-2">
-                                SUM: {gameState.players.PLAYER.powerHand.filter(c => selectedCardsForLevelUp.includes(c.id)).reduce((a,b)=>a+b.value,0)}
-                            </div>
-                            <button onClick={handleConfirmLevelUp} className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded font-bold">{ui.confirm}</button>
-                            <button onClick={handleCancelLevelUp} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
-                        </>
-                     )}
+            {/* PANEL 4: ACTIONS */}
+            {gameState.gameStatus === 'PLAYING' && gameState.fsmState !== FsmState.PLAYER_CHOSE_CHAR && gameState.fsmState !== FsmState.ROUND_TRANSITION && (
+                <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-md p-4">
+                    <div className="flex gap-4 items-center min-h-[60px] flex-wrap justify-center">
+                        <div className="text-slate-400 text-sm font-mono mr-auto w-full lg:w-auto mb-2 lg:mb-0">
+                            {gameState.fsmState === FsmState.SHOWDOWN ? txt.ui.combatResolved : 
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW ? txt.warnings?.selectDiscardForDraw :
+                            gameState.fsmState === FsmState.SELECT_CARDS_FOR_LEVEL_UP ? txt.warnings?.selectCardsForLevelUp :
+                            gameState.fsmState === FsmState.SELECT_ATTACK_CARD ? txt.warnings?.selectAttackToExec :
+                            gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC ? txt.warnings?.selectDiscardGeneric :
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_VISION ? txt.warnings?.selectDiscardForDraw :
+                            gameState.pendingAction.attackingCard ? `${txt.ui.attackWith} ${gameState.pendingAction.attackingCard.value}` : 
+                            ui.waiting}
+                        </div>
+                        
+                        {/* Buttons for Level Up Confirmation */}
+                        {gameState.fsmState === FsmState.SELECT_CARDS_FOR_LEVEL_UP && (
+                            <>
+                                <div className="text-yellow-400 font-mono text-sm mr-2">
+                                    SUM: {gameState.players.PLAYER.powerHand.filter(c => selectedCardsForLevelUp.includes(c.id)).reduce((a,b)=>a+b.value,0)}
+                                </div>
+                                <button onClick={handleConfirmLevelUp} className="flex-1 min-w-[120px] px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded font-bold">{ui.confirm}</button>
+                                <button onClick={handleCancelLevelUp} className="flex-1 min-w-[120px] px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
+                            </>
+                        )}
 
-                     {/* Main Buttons */}
-                     {gameState.fsmState === FsmState.MAIN_PHASE && (
-                        <>
-                             {!isAbilityFull && (
+                        {/* Main Buttons */}
+                        {gameState.fsmState === FsmState.MAIN_PHASE && (
+                            <>
+                                {!isAbilityFull && (
+                                    <button 
+                                        onClick={handleDrawAbility}
+                                        disabled={gameState.players.PLAYER.powerHand.length === 0}
+                                        className={`flex-1 min-w-[120px] px-3 py-1 bg-indigo-900/50 text-indigo-200 border border-indigo-700 rounded text-xs ${gameState.players.PLAYER.abilitiesDrawnThisTurn >= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-800'}`}
+                                    >
+                                        {ui.drawAbility}
+                                    </button>
+                                )}
+
+                                {gameState.players.PLAYER.level < 3 && (
+                                    <button 
+                                        onClick={handleLevelUp}
+                                        disabled={gameState.players.PLAYER.levelUpsPerformed >= 1}
+                                        className={`flex-1 min-w-[120px] px-4 py-2 rounded font-bold ${gameState.players.PLAYER.levelUpsPerformed >= 1 ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                                    >
+                                        {ui.levelUp}
+                                    </button>
+                                )}
+
                                 <button 
-                                    onClick={handleDrawAbility}
+                                    disabled={gameState.players.PLAYER.attacksPerformed >= (1 + gameState.players.PLAYER.level) || !gameState.players.PLAYER.powerHand.some(c => c.type === 'ATK')}
+                                    onClick={() => handleConfirmAction('ATTACK_DIRECT')}
+                                    className={`flex-1 min-w-[120px] px-4 py-2 rounded font-bold ${gameState.players.PLAYER.attacksPerformed >= (1 + gameState.players.PLAYER.level) || !gameState.players.PLAYER.powerHand.some(c => c.type === 'ATK') ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : gameState.pendingAction.attackingCard ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-red-800 hover:bg-red-700 text-red-100'}`}
+                                >
+                                    {ui.attackDirect}
+                                </button>
+
+                                <button
+                                    onClick={handleDiscardAction}
                                     disabled={gameState.players.PLAYER.powerHand.length === 0}
-                                    className={`px-3 py-1 bg-indigo-900/50 text-indigo-200 border border-indigo-700 rounded text-xs ${gameState.players.PLAYER.abilitiesDrawnThisTurn >= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-800'}`}
+                                    className={`flex-1 min-w-[120px] px-4 py-2 bg-gray-700 hover:bg-gray-600 text-slate-200 rounded font-bold border border-gray-600 ${gameState.players.PLAYER.powerHand.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    {ui.drawAbility}
+                                    {ui.discard}
                                 </button>
-                             )}
+                                
+                                <button onClick={() => handleConfirmAction('END_TURN')} className="flex-1 min-w-[120px] px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.endTurn}</button>
+                            </>
+                        )}
+                        
+                        {/* Cancel button */}
+                        {(gameState.fsmState === FsmState.SELECT_ATTACK_CARD || gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW || gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC || gameState.fsmState === FsmState.SELECT_DISCARD_FOR_VISION) && (
+                            <button onClick={() => setGameState(prev => ({...prev, fsmState: FsmState.MAIN_PHASE}))} className="flex-1 min-w-[120px] px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
+                        )}
 
-                            {gameState.players.PLAYER.level < 3 && (
-                                <button 
-                                    onClick={handleLevelUp}
-                                    disabled={gameState.players.PLAYER.levelUpsPerformed >= 1}
-                                    className={`px-4 py-2 rounded font-bold ${gameState.players.PLAYER.levelUpsPerformed >= 1 ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
-                                >
-                                    {ui.levelUp}
-                                </button>
-                            )}
-
-                            <button 
-                                disabled={gameState.players.PLAYER.attacksPerformed >= (1 + gameState.players.PLAYER.level) || !gameState.players.PLAYER.powerHand.some(c => c.type === 'ATK')}
-                                onClick={() => handleConfirmAction('ATTACK_DIRECT')}
-                                className={`px-4 py-2 rounded font-bold ${gameState.players.PLAYER.attacksPerformed >= (1 + gameState.players.PLAYER.level) || !gameState.players.PLAYER.powerHand.some(c => c.type === 'ATK') ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : gameState.pendingAction.attackingCard ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-red-800 hover:bg-red-700 text-red-100'}`}
-                            >
-                                {ui.attackDirect}
-                            </button>
-
-                            <button
-                                onClick={handleDiscardAction}
-                                disabled={gameState.players.PLAYER.powerHand.length === 0}
-                                className={`px-4 py-2 bg-gray-700 hover:bg-gray-600 text-slate-200 rounded font-bold border border-gray-600 ${gameState.players.PLAYER.powerHand.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                {ui.discard}
-                            </button>
-                            
-                            <button onClick={() => handleConfirmAction('END_TURN')} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.endTurn}</button>
-                        </>
-                    )}
-                    
-                    {/* Cancel button for Attack Selection or Draw Selection */}
-                    {(gameState.fsmState === FsmState.SELECT_ATTACK_CARD || gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW || gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC) && (
-                        <button onClick={() => setGameState(prev => ({...prev, fsmState: FsmState.MAIN_PHASE}))} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
-                    )}
-
-                    {gameState.fsmState === FsmState.AWAITING_PLAYER_DEFENSE && (
-                        <>
-                             <button disabled={!gameState.pendingAction.defendingCard && gameState.pendingAction.vortexDefenseIndex === null} onClick={() => handleConfirmAction('DEFEND_WITH_CARD')} className={`px-4 py-2 rounded font-bold ${gameState.pendingAction.defendingCard || gameState.pendingAction.vortexDefenseIndex !== null ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-700 text-slate-500'}`}>{gameState.pendingAction.vortexDefenseIndex !== null ? ui.confirmVortex : ui.confirmDef}</button>
-                            <button onClick={() => handleConfirmAction('NO_DEFENSE')} className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 rounded font-bold">{ui.takeDmg}</button>
-                        </>
-                    )}
-                </div>
+                        {gameState.fsmState === FsmState.AWAITING_PLAYER_DEFENSE && (
+                            <>
+                                <button disabled={!gameState.pendingAction.defendingCard && gameState.pendingAction.vortexDefenseIndex === null} onClick={() => handleConfirmAction('DEFEND_WITH_CARD')} className={`flex-1 min-w-[120px] px-4 py-2 rounded font-bold ${gameState.pendingAction.defendingCard || gameState.pendingAction.vortexDefenseIndex !== null ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-700 text-slate-500'}`}>{gameState.pendingAction.vortexDefenseIndex !== null ? ui.confirmVortex : ui.confirmDef}</button>
+                                <button onClick={() => handleConfirmAction('NO_DEFENSE')} className="flex-1 min-w-[120px] px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 rounded font-bold">{ui.takeDmg}</button>
+                            </>
+                        )}
+                    </div>
+                </section>
             )}
         </div>
-        <div className="lg:col-span-1 flex flex-col gap-2 h-full overflow-hidden">
-            <div className="flex-1 min-h-0 bg-slate-800 rounded-lg border border-slate-700 shadow-inner flex flex-col overflow-hidden relative"><div className="absolute inset-0 flex flex-col"><GameLog logs={gameState.gameLog} /></div></div>
-            <div className="shrink-0 p-3 bg-slate-800 rounded-lg border border-slate-700 text-[11px] leading-tight text-slate-400 font-mono shadow-md">
-                <h4 className="font-bold text-slate-200 mb-1 text-xs">{ui.quickRules}</h4>
-                <ul className="space-y-1 list-disc list-inside">{ui.rulesList.map((r, i) => <li key={i}>{r}</li>)}</ul>
-                <div className="mt-2 pt-2 border-t border-slate-700 text-center flex flex-col gap-2">
-                    <button onClick={() => setShowRulesModal(true)} className="text-yellow-500 hover:text-yellow-400 underline text-xs font-bold font-cinzel tracking-wider">{ui.readRules}</button>
-                    <button onClick={() => setShowHistoryModal(true)} className="text-purple-400 hover:text-purple-300 underline text-xs font-bold font-cinzel tracking-wider">{ui.readLore}</button>
+
+        {/* RIGHT COLUMN: LOG (PANEL 5) & HELP (PANEL 6) */}
+        <div className="lg:col-span-1 flex flex-col gap-4 h-full overflow-hidden">
+            
+            {/* PANEL 5: LOG */}
+            <section className="flex-1 min-h-0 bg-slate-800 rounded-xl border border-slate-700 shadow-md flex flex-col overflow-hidden relative">
+                <div className="absolute inset-0 flex flex-col p-1">
+                    <GameLog logs={gameState.gameLog} />
                 </div>
-            </div>
+            </section>
+            
+            {/* PANEL 6: HELP & SHORTCUTS */}
+            <section className="shrink-0 p-4 bg-slate-800 rounded-xl border border-slate-700 shadow-md text-[11px] leading-tight text-slate-400 font-mono">
+                <h4 className="font-bold text-slate-200 mb-2 text-xs uppercase border-b border-slate-600 pb-1">{ui.quickRules}</h4>
+                <ul className="space-y-1.5 list-disc list-inside mb-3">{ui.rulesList.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                <div className="pt-2 border-t border-slate-700 text-center flex flex-col gap-2">
+                    <button onClick={() => setShowRulesModal(true)} className="bg-slate-700/50 hover:bg-slate-700 text-yellow-500 py-1.5 rounded transition-colors text-xs font-bold font-cinzel tracking-wider border border-slate-600">{ui.readRules}</button>
+                    <button onClick={() => setShowHistoryModal(true)} className="bg-slate-700/50 hover:bg-slate-700 text-purple-400 py-1.5 rounded transition-colors text-xs font-bold font-cinzel tracking-wider border border-slate-600">{ui.readLore}</button>
+                    <button onClick={() => setShowAbilityModal(true)} className="bg-slate-700/50 hover:bg-slate-700 text-indigo-400 py-1.5 rounded transition-colors text-xs font-bold font-cinzel tracking-wider border border-slate-600">{ui.abilityGuide}</button>
+                </div>
+            </section>
         </div>
       </main>
     </div>

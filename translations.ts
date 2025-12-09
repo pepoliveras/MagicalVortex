@@ -1,5 +1,3 @@
-
-
 import { Language } from './types';
 
 export const TEXTS = {
@@ -16,6 +14,7 @@ export const TEXTS = {
       shield: "Shield",
       abilities: "Abilities",
       empty: "Empty",
+      vortexLabel: "THE VORTEX",
       drawAbility: "DRAW ABILITY",
       levelUp: "LEVEL UP",
       maxLevel: "MAX LEVEL",
@@ -29,8 +28,10 @@ export const TEXTS = {
       playAgain: "PLAY AGAIN",
       readLore: "📜 READ LORE & HISTORY",
       readRules: "📜 READ EXTENDED RULES",
+      abilityGuide: "📘 ABILITY GUIDE",
       closeHistory: "Close History",
       closeRules: "Close Rules",
+      closeGuide: "Close Guide",
       quickRules: "QUICK RULES",
       rulesList: [
         "Opposite Colors: Atk - Def",
@@ -47,6 +48,15 @@ export const TEXTS = {
       combatResolved: "COMBAT RESOLVED! Revealing...",
       attackWith: "Attack with:",
       discard: "DISCARD",
+      round: "ROUND",
+      aiLevel: "AI Difficulty",
+      levelBeg: "INITIAL",
+      levelInt: "INTERMEDIATE",
+      levelAdv: "ADVANCED",
+      roundClear: "ROUND CLEARED!",
+      nextRound: "NEXT ROUND",
+      roundDesc: "The opponent evolves. Prepare for the next battle.",
+      finalVictory: "ULTIMATE VICTORY!"
     },
     rules: {
       title: "Extended Rules",
@@ -80,26 +90,63 @@ export const TEXTS = {
         char12: "Avatar of the Primal Storm. Born from the Vortex itself, a chaotic convergence of fire, water, earth, and air. It has no morality, only the raw, untamed force of nature seeking to return all to elemental chaos. It is the storm that approaches, the earthquake that shatters, and the fire that consumes."
     },
     abilities: {
-        MAGIC_WALL: { name: "Magic Wall", desc: "Discard a card to create a permanent shield." },
-        DARK_DEFENSE: { name: "Dark Defense", desc: "Black Def cards +Level." },
-        LIGHT_DEFENSE: { name: "Light Defense", desc: "White Def cards +Level." },
-        PALADIN_OF_LIGHT: { name: "Paladin of Light", desc: "White Atk cards +Level." },
-        DARK_LORD: { name: "Dark Lord", desc: "Black Atk cards +Level." },
-        MAGIC_AFFINITY: { name: "Magic Affinity", desc: "Discard a card. Heal Value/2 + Level." },
-        MAGIC_VISION: { name: "Magic Vision", desc: "Reveal opponent hand." },
-        MAGIC_KNOWLEDGE: { name: "Magic Knowledge", desc: "Max Hand Size +Level." },
-        MAGIC_RESISTANCE: { name: "Magic Resistance", desc: "Max HP +10 per Level." },
-        MIND_CONTROL: { name: "Mind Control", desc: "Discard 1. Opponent discards half value." },
-        ELEMENTAL_CONTROL: { name: "Elemental Control", desc: "Discard 1. Change card color." },
-        MAGIC_CONTROL: { name: "Magic Control", desc: "Discard 1. Change card type." },
-        VORTEX_CONTROL: { name: "Vortex Control", desc: "Use Vortex for Defense once per turn." },
-        LIGHT_AFFINITY: { name: "Light Affinity", desc: "Discard White card. Heal Value/2 + Level." },
-        DARK_AFFINITY: { name: "Dark Affinity", desc: "Discard Black card. Heal Value/2 + Level." },
-        MASTER_CONTROL: { name: "Master Control", desc: "Discard 1. Change color or type." },
-        DARK_SERVANT: { name: "Dark Servant", desc: "Reduce incoming Black Atk by half." },
-        ACOLYTE_OF_LIGHT: { name: "Acolyte of Light", desc: "Reduce incoming White Atk by half." },
-        MASTER_AFFINITY: { name: "Master Affinity", desc: "Discard 1. Heal full Value." },
-        MASTER_VORTEX: { name: "Master Vortex", desc: "Use Vortex for Attack unlimited times." }
+        MAGIC_WALL: { name: "Magic Wall", desc: "Active. Discard 1. Create Shield = Card Value." },
+        DARK_DEFENSE: { name: "Dark Defense", desc: "Passive. Black Def cards +Level." },
+        LIGHT_DEFENSE: { name: "Light Defense", desc: "Passive. White Def cards +Level." },
+        PALADIN_OF_LIGHT: { name: "Paladin of Light", desc: "Passive. White Atk cards +Level." },
+        DARK_LORD: { name: "Dark Lord", desc: "Passive. Black Atk cards +Level." },
+        MAGIC_AFFINITY: { name: "Magic Affinity", desc: "Active. Discard 1. Heal Value/2 + Level." },
+        MAGIC_VISION: { name: "Magic Vision", desc: "Active. Discard 1. Reveal opponent hand." },
+        MAGIC_KNOWLEDGE: { name: "Magic Knowledge", desc: "Passive. Max Hand Size +Level." },
+        MAGIC_RESISTANCE: { name: "Magic Resistance", desc: "Passive. Max HP +10 per Level." },
+        MIND_CONTROL: { name: "Mind Control", desc: "Active. Discard 1. Foe discards Level cards." },
+        ELEMENTAL_CONTROL: { name: "Elemental Control", desc: "Active. Discard 1. Change card Color." },
+        MAGIC_CONTROL: { name: "Magic Control", desc: "Active. Discard 1. Change card Type." },
+        VORTEX_CONTROL: { name: "Vortex Control", desc: "Passive. Use Vortex for Defense 1/turn." },
+        LIGHT_AFFINITY: { name: "Light Affinity", desc: "Active. Discard White. Heal Value/2 + Level." },
+        DARK_AFFINITY: { name: "Dark Affinity", desc: "Active. Discard Black. Heal Value/2 + Level." },
+        MASTER_CONTROL: { name: "Master Control", desc: "Active. Discard 1. Change Color & Type." },
+        DARK_SERVANT: { name: "Dark Servant", desc: "Passive. Half incoming Black dmg." },
+        ACOLYTE_OF_LIGHT: { name: "Acolyte of Light", desc: "Passive. Half incoming White dmg." },
+        MASTER_AFFINITY: { name: "Master Affinity", desc: "Active. Discard 1. Heal Full Value." },
+        MASTER_VORTEX: { name: "Master Vortex", desc: "Passive. Unlimited Vortex Attacks." }
+    },
+    abilityDefinitions: {
+      neutral: {
+        title: "NEUTRAL ABILITIES",
+        list: [
+          "Magic Wall (Lvl I, Active): Discard a card to create a permanent shield equal to the card's value. The shield absorbs damage until depleted. You cannot replace a shield until it is destroyed.",
+          "Magic Affinity (Lvl I, Active): Discard a card. Heal HP equal to half the card's value plus your Level.",
+          "Magic Vision (Lvl I, Active): Discard a card. Reveal the opponent's hand for this turn.",
+          "Magic Knowledge (Lvl I, Passive): Increases maximum hand size by +1 per Level.",
+          "Magic Resistance (Lvl I, Passive): Increases maximum HP by +10 per Level.",
+          "Mind Control (Lvl II, Active): Discard a card. Opponent randomly discards cards equal to your Character Level.",
+          "Elemental Control (Lvl II, Active): Discard a card. Change the color of one of your cards.",
+          "Magic Control (Lvl II, Active): Discard a card. Change the type (Atk/Def) of one of your cards.",
+          "Vortex Control (Lvl II, Passive): Allows you to use the Vortex for Defense once per turn.",
+          "Master Control (Lvl III, Active): Discard a card. Change both color and type of one of your cards.",
+          "Master Affinity (Lvl III, Active): Discard a card. Heal HP equal to the full value of the discarded card.",
+          "Master Vortex (Lvl III, Passive): Allows unlimited use of the Vortex for Attacks during your turn."
+        ]
+      },
+      white: {
+        title: "WHITE AFFINITY ABILITIES",
+        list: [
+          "Light Defense (Lvl I, Passive): Increases value of any White Defense card by +1 per Level.",
+          "Paladin of Light (Lvl I, Passive): Increases value of any White Attack card by +1 per Level.",
+          "Light Affinity (Lvl II, Active): Discard a White card. Heal HP equal to half the card's value plus your Level.",
+          "Acolyte of Light (Lvl III, Passive): Reduces all incoming White Attack damage by half."
+        ]
+      },
+      black: {
+        title: "BLACK AFFINITY ABILITIES",
+        list: [
+          "Dark Defense (Lvl I, Passive): Increases value of any Black Defense card by +1 per Level.",
+          "Dark Lord (Lvl I, Passive): Increases value of any Black Attack card by +1 per Level.",
+          "Dark Affinity (Lvl II, Active): Discard a Black card. Heal HP equal to half the card's value plus your Level.",
+          "Dark Servant (Lvl III, Passive): Reduces all incoming Black Attack damage by half."
+        ]
+      }
     },
     warnings: {
         levelTooLow: "Level too low to use this ability.",
@@ -115,13 +162,14 @@ export const TEXTS = {
         darkAffinityReq: "Dark Affinity requires discarding a BLACK card.",
         shieldActive: "Shield already active. Must reach 0 to replace.",
         abilityUsed: "Ability already used this turn.",
-        noAbilities: "No abilities available for your level.",
+        noAbilities: "No abilities available for your level/affinity.",
         selectAttackCard: "Please select an Attack card first.",
-        abilityLimitReached: "Active Ability limit reached (Level + 1).",
+        abilityLimitReached: "Active Ability limit reached.",
         selectAttackToExec: "Select an Attack card to execute.",
         selectDiscardForDraw: "Select a card to discard for ability.",
         selectCardsForLevelUp: "Select cards to sum 10 or more.",
         selectDiscardGeneric: "Select a card to discard.",
+        wrongAffinity: "Your character cannot use this affinity.",
     },
     logs: {
         turnStart: (p: string) => `--- Start of ${p} Turn ---`,
@@ -155,7 +203,10 @@ export const TEXTS = {
         atkLabel: "(Atk)",
         defLabel: "(Def)",
         vortexLabel: "(Vortex)",
-        discardedGeneric: (val: number, col: string, type: string) => `Discarded ${val} ${col} ${type}.`
+        discardedGeneric: (val: number, col: string, type: string) => `Discarded ${val} ${col} ${type}.`,
+        visionActivated: "Magic Vision! Opponent's hand revealed.",
+        aiLevelsUp: "AI Leveled Up!",
+        aiDrawsAbility: "AI draws an Ability."
     }
   },
   es: {
@@ -171,6 +222,7 @@ export const TEXTS = {
       shield: "Escudo",
       abilities: "Habilidades",
       empty: "Vacío",
+      vortexLabel: "EL VÓRTICE",
       drawAbility: "ROBAR HABILIDAD",
       levelUp: "SUBIR NIVEL",
       maxLevel: "NIVEL MÁX",
@@ -184,8 +236,10 @@ export const TEXTS = {
       playAgain: "JUGAR DE NUEVO",
       readLore: "📜 LEER HISTORIA",
       readRules: "📜 LEER REGLAS EXTENDIDAS",
+      abilityGuide: "📘 GUÍA DE HABILIDADES",
       closeHistory: "Cerrar Historia",
       closeRules: "Cerrar Reglas",
+      closeGuide: "Cerrar Guía",
       quickRules: "REGLAS RÁPIDAS",
       rulesList: [
         "Colores Opuestos: Atq - Def",
@@ -202,15 +256,24 @@ export const TEXTS = {
       combatResolved: "¡COMBATE RESUELTO! Revelando...",
       attackWith: "Ataca con:",
       discard: "DESCARTAR",
+      round: "RONDA",
+      aiLevel: "Dificultad IA",
+      levelBeg: "INICIAL",
+      levelInt: "INTERMEDIA",
+      levelAdv: "AVANZADA",
+      roundClear: "¡RONDA SUPERADA!",
+      nextRound: "SIGUIENTE RONDA",
+      roundDesc: "El oponente evoluciona. Prepárate para la batalla.",
+      finalVictory: "¡VICTORIA TOTAL!"
     },
     rules: {
       title: "Reglas Extendidas",
       goal: { title: "Objetivo", text: "Derrota al oponente reduciendo su Vida a 0. Puedes atacar directamente o usar el Vórtice." },
       cards: { title: "Cartas", text: "El mazo consta de cartas Blancas y Negras, divididas en tipos Ataque (Rayo) y Defensa (Escudo). Valores del 1 al 10." },
-      combat: { title: "Lógica de Combat", text: "Al Atacar: Si los colores son Opuestos (Negro vs Blanco), el daño es Ataque menos Defensa. Si son el Mismo Color, el daño es Ataque menos (Defensa / 2). ¡Si el resultado es negativo, el daño rebota al atacante!" },
+      combat: { title: "Lógica de Combate", text: "Al Atacar: Si los colores son Opuestos (Negro vs Blanco), el daño es Ataque menos Defensa. Si son el Mismo Color, el daño es Ataque menos (Defensa / 2). ¡Si el resultado es negativo, el daño rebota al atacante!" },
       vortex: { title: "El Vórtice", text: "Las 4 cartas centrales forman el Vórtice. Puedes usarlas para Atacar o Defender. Lógica: Mismo Color suma poder. Color Diferente resta poder. Un resultado negativo causa Inestabilidad (Daño de retroceso)." },
       leveling: { title: "Subir Nivel", text: "Selecciona cartas en tu mano que sumen 10 o más para Subir Nivel. Máx Nivel 3. Subir de nivel aumenta el tamaño de mano, ataques por turno y desbloquea habilidades superiores." },
-      abilities: { title: "Habilidades", text: "Puedes descartar 1 carta para robar una nueva Habilidad. Máximo de habilidades activas = Nivel + 1. Las habilidades pueden ser Pasivas (siempre activas) o Activas (requieren activación)." }
+      abilities: { title: "Habilidades", text: "Descarta 1 carta para robar Habilidad. Personajes Blancos/Negros Máx Hab = Nivel + 1. Neutrales Máx = Nivel. Las habilidades pueden ser Pasivas o Activas." }
     },
     lore: {
       title: "El Universo del Vórtice",
@@ -235,26 +298,63 @@ export const TEXTS = {
         char12: "Avatar de la Tormenta Primigenia. Nacido del propio Vórtice, una convergencia caótica de fuego, agua, tierra y aire. No tiene moralidad, solo la fuerza bruta e indómita de la naturaleza buscando devolver todo al caos elemental. Es la tormenta que se acerca, el terremoto que destruye y el fuego que consume."
     },
     abilities: {
-        MAGIC_WALL: { name: "Muro Mágico", desc: "Descarta una carta para crear escudo permanente." },
-        DARK_DEFENSE: { name: "Defensa Oscura", desc: "Cartas Def Negras +Nivel." },
-        LIGHT_DEFENSE: { name: "Defensa de Luz", desc: "Cartas Def Blancas +Nivel." },
-        PALADIN_OF_LIGHT: { name: "Paladín de Luz", desc: "Cartas Atq Blancas +Nivel." },
-        DARK_LORD: { name: "Señor Oscuro", desc: "Cartas Atq Negras +Nivel." },
-        MAGIC_AFFINITY: { name: "Afinidad Mágica", desc: "Descarta carta. Cura Valor/2 + Nivel." },
-        MAGIC_VISION: { name: "Visión Mágica", desc: "Revela mano del oponente." },
-        MAGIC_KNOWLEDGE: { name: "Conocimiento Mágico", desc: "Tam. Mano Máx +Nivel." },
-        MAGIC_RESISTANCE: { name: "Resistencia Mágica", desc: "Vida Máx +10 por Nivel." },
-        MIND_CONTROL: { name: "Control Mental", desc: "Descarta 1. Oponente descarta mitad valor." },
-        ELEMENTAL_CONTROL: { name: "Control Elemental", desc: "Descarta 1. Cambia color carta." },
-        MAGIC_CONTROL: { name: "Control Mágico", desc: "Descarta 1. Cambia tipo carta." },
-        VORTEX_CONTROL: { name: "Control de Vórtice", desc: "Usa Vórtice para Defensa 1 vez/turno." },
-        LIGHT_AFFINITY: { name: "Afinidad Luz", desc: "Descarta Blanca. Cura Valor/2 + Nivel." },
-        DARK_AFFINITY: { name: "Afinidad Oscura", desc: "Descarta Negra. Cura Valor/2 + Nivel." },
-        MASTER_CONTROL: { name: "Control Maestro", desc: "Descarta 1. Cambia color o tipo." },
-        DARK_SERVANT: { name: "Siervo Oscuro", desc: "Reduce Atq Negro entrante a la mitad." },
-        ACOLYTE_OF_LIGHT: { name: "Acólito de Luz", desc: "Reduce Atq Blanco entrante a la mitad." },
-        MASTER_AFFINITY: { name: "Afinidad Maestra", desc: "Descarta 1. Cura Valor completo." },
-        MASTER_VORTEX: { name: "Vórtice Maestro", desc: "Usa Vórtice para Ataque ilimitado." }
+        MAGIC_WALL: { name: "Muro Mágico", desc: "Activa. Descarta 1. Crea Escudo = Valor Carta." },
+        DARK_DEFENSE: { name: "Defensa Oscura", desc: "Pasiva. Cartas Def Negras +Nivel." },
+        LIGHT_DEFENSE: { name: "Defensa de Luz", desc: "Pasiva. Cartas Def Blancas +Nivel." },
+        PALADIN_OF_LIGHT: { name: "Paladín de Luz", desc: "Pasiva. Cartas Atq Blancas +Nivel." },
+        DARK_LORD: { name: "Señor Oscuro", desc: "Pasiva. Cartas Atq Negras +Nivel." },
+        MAGIC_AFFINITY: { name: "Afinidad Mágica", desc: "Activa. Descarta 1. Cura Valor/2 + Nivel." },
+        MAGIC_VISION: { name: "Visión Mágica", desc: "Activa. Descarta 1. Revela mano oponente." },
+        MAGIC_KNOWLEDGE: { name: "Conocimiento Mágico", desc: "Pasiva. Tam. Mano +Nivel." },
+        MAGIC_RESISTANCE: { name: "Resistencia Mágica", desc: "Pasiva. Vida Máx +10/Nivel." },
+        MIND_CONTROL: { name: "Control Mental", desc: "Activa. Descarta 1. Oponente descarta Nivel." },
+        ELEMENTAL_CONTROL: { name: "Control Elemental", desc: "Activa. Descarta 1. Cambia color carta." },
+        MAGIC_CONTROL: { name: "Control Mágico", desc: "Activa. Descarta 1. Cambia tipo carta." },
+        VORTEX_CONTROL: { name: "Control de Vórtice", desc: "Pasiva. Usa Vórtice en Defensa 1/turno." },
+        LIGHT_AFFINITY: { name: "Afinidad Luz", desc: "Activa. Descarta Blanca. Cura Valor/2 + Nivel." },
+        DARK_AFFINITY: { name: "Afinidad Oscura", desc: "Activa. Descarta Negra. Cura Valor/2 + Nivel." },
+        MASTER_CONTROL: { name: "Control Maestro", desc: "Activa. Descarta 1. Cambia color y tipo." },
+        DARK_SERVANT: { name: "Siervo Oscuro", desc: "Pasiva. Mitad daño Negro entrante." },
+        ACOLYTE_OF_LIGHT: { name: "Acólito de Luz", desc: "Pasiva. Mitad daño Blanco entrante." },
+        MASTER_AFFINITY: { name: "Afinidad Maestra", desc: "Activa. Descarta 1. Cura Valor total." },
+        MASTER_VORTEX: { name: "Vórtice Maestro", desc: "Pasiva. Ataques Vórtice ilimitados." }
+    },
+    abilityDefinitions: {
+      neutral: {
+        title: "HABILIDADES NEUTRALES",
+        list: [
+          "Muro Mágico (Nv I, Activa): Descarta una carta. Genera un escudo permanente igual al valor de la carta descartada. El escudo absorbe daño hasta agotarse. No se puede reemplazar hasta ser destruido.",
+          "Afinidad Mágica (Nv I, Activa): Descarta una carta. Recupera Vida igual a la mitad del valor de la carta más el nivel del jugador.",
+          "Visión Mágica (Nv I, Activa): Descarta una carta. Se muestran todas las cartas de un oponente este turno.",
+          "Conocimiento Mágico (Nv I, Pasiva): Incrementa el máximo número permitido de cartas en la mano en +1 por nivel.",
+          "Resistencia Mágica (Nv I, Pasiva): Incrementa el máximo de puntos de vitalidad permitido en +10 por nivel.",
+          "Control Mental (Nv II, Activa): Descarta una carta. Un oponente se descarta de tantas cartas al azar como Nivel del personaje.",
+          "Control Elemental (Nv II, Activa): Descarta una carta. Cambia el color de una carta propia.",
+          "Control Mágico (Nv II, Activa): Descarta una carta. Cambia el tipo (Atq/Def) de una carta propia.",
+          "Control de Vórtice (Nv II, Pasiva): Permite utilizar el VÓRTICE en defensa un vez por turno.",
+          "Control Maestro (Nv III, Activa): Descarta una carta. Cambia el color y el tipo de una carta propia.",
+          "Afinidad Maestra (Nv III, Activa): Descarta una carta. Recupera Vida igual al valor total de la carta descartada.",
+          "Vórtice Maestro (Nv III, Pasiva): Permite utilizar el VÓRTICE tantas veces como se quiera en ataque."
+        ]
+      },
+      white: {
+        title: "HABILIDADES DE AFINIDAD BLANCA",
+        list: [
+          "Defensa de Luz (Nv I, Pasiva): Incrementa cualquier carta de defensa blanca en +1 por nivel.",
+          "Paladín de Luz (Nv I, Pasiva): Incrementa cualquier carta de ataque blanca en +1 por nivel.",
+          "Afinidad de Luz (Nv II, Activa): Descarta una carta blanca. Recupera Vida igual a la mitad del valor más el nivel.",
+          "Acólito de Luz (Nv III, Pasiva): Redueix tot el mal d'un atac blanc a la meitat."
+        ]
+      },
+      black: {
+        title: "HABILIDADES DE AFINIDAD NEGRA",
+        list: [
+          "Defensa Oscura (Nv I, Pasiva): Incrementa cualquier carta de defensa Negra en +1 por nivel.",
+          "Señor Oscuro (Nv I, Pasiva): Incrementa cualquier carta de ataque negra en +1 por nivel.",
+          "Afinidad Oscura (Nv II, Activa): Descarta una carta negra. Recupera Vida igual a la mitad del valor más el nivel.",
+          "Siervo Oscuro (Nv III, Pasiva): Redueix tot el mal d'un atac negre a la meitat."
+        ]
+      }
     },
     warnings: {
         levelTooLow: "Nivel insuficiente.",
@@ -270,13 +370,14 @@ export const TEXTS = {
         darkAffinityReq: "Afinidad Oscura requiere descartar carta NEGRA.",
         shieldActive: "Escudo ya activo. Debe llegar a 0 para reemplazar.",
         abilityUsed: "Habilidad ya usada este turno.",
-        noAbilities: "No hay habilidades disponibles para tu nivel.",
+        noAbilities: "No hay habilidades disponibles para tu nivel/afinidad.",
         selectAttackCard: "Por favor, selecciona una carta de Ataque primero.",
-        abilityLimitReached: "Límite de Habilidades activas alcanzado (Nivel + 1).",
+        abilityLimitReached: "Límite de Habilidades activas alcanzado.",
         selectAttackToExec: "Selecciona una carta de Ataque para ejecutar.",
         selectDiscardForDraw: "Selecciona una carta para descartar.",
         selectCardsForLevelUp: "Selecciona cartas que sumen 10 o más.",
         selectDiscardGeneric: "Selecciona una carta para descartar.",
+        wrongAffinity: "Tu personaje no puede usar esta afinidad.",
     },
     logs: {
         turnStart: (p: string) => `--- Inicio Turno de ${p} ---`,
@@ -310,7 +411,10 @@ export const TEXTS = {
         atkLabel: "(Atq)",
         defLabel: "(Def)",
         vortexLabel: "(Vórtice)",
-        discardedGeneric: (val: number, col: string, type: string) => `Descartado ${val} ${col} ${type}.`
+        discardedGeneric: (val: number, col: string, type: string) => `Descartado ${val} ${col} ${type}.`,
+        visionActivated: "¡Visión Mágica! Mano oponente revelada.",
+        aiLevelsUp: "¡IA Subió de Nivel!",
+        aiDrawsAbility: "IA roba una Habilidad."
     }
   },
   ca: {
@@ -326,6 +430,7 @@ export const TEXTS = {
       shield: "Escut",
       abilities: "Habilitats",
       empty: "Buit",
+      vortexLabel: "EL VÒRTEX",
       drawAbility: "ROBAR HABILITAT",
       levelUp: "PUJAR NIVELL",
       maxLevel: "NIVELL MÀX",
@@ -339,13 +444,15 @@ export const TEXTS = {
       playAgain: "JUGAR DE NOU",
       readLore: "📜 LLEGIR HISTÒRIA",
       readRules: "📜 LLEGIR REGLES EXTESES",
+      abilityGuide: "📘 GUIA D'HABILITATS",
       closeHistory: "Tancar Història",
       closeRules: "Tancar Regles",
+      closeGuide: "Tancar Guia",
       quickRules: "REGLES RÀPIDES",
       rulesList: [
         "Colors Oposats: Atc - Def",
         "Mateix Color: Atc - terra(Def/2)",
-        "Pujar Nivell: Suma cartes >= 10. Máx Nv 3.",
+        "Pujar Nivell: Suma cartas >= 10. Máx Nv 3.",
         "Habilitat: Descarta 1 per robar.",
         "Vòrtex: Mateix + ; Diferente -",
         "Atac Vòrtex acaba el torn."
@@ -357,15 +464,24 @@ export const TEXTS = {
       combatResolved: "COMBAT RESOLT! Revelant...",
       attackWith: "Ataca amb:",
       discard: "DESCARTAR",
+      round: "RONDA",
+      aiLevel: "Dificultat IA",
+      levelBeg: "INICIAL",
+      levelInt: "INTERMITJA",
+      levelAdv: "AVANÇADA",
+      roundClear: "RONDA SUPERADA!",
+      nextRound: "SEGÜENT RONDA",
+      roundDesc: "L'oponent evoluciona. Prepara't per a la següent batalla.",
+      finalVictory: "VICTÒRIA TOTAL!"
     },
     rules: {
       title: "Regles Exteses",
-      goal: { title: "Objectiu", text: "Derrota l'oponent reduint la seva Vida a 0. Pots atacar directament o utilitzar el Vòrtex." },
-      cards: { title: "Cartes", text: "La baralla consta de cartes Blanques i Negres, dividides en tipus Atac (Llamp) i Defensa (Escut). Valors de l'1 al 10." },
-      combat: { title: "Lògica de Combat", text: "En Atacar: Si els colors són Oposats (Negre vs Blanc), el dany és Atac menys Defensa. Si són el Mateix Color, el dany és Atac menys (Defensa / 2). Si el resultat és negatiu, el dany rebota a l'atacant!" },
-      vortex: { title: "El Vòrtex", text: "Les 4 cartes centrals formen el Vòrtex. Pots utilitzar-les per Atacar o Defensar. Lògica: Mateix Color suma poder a la teva carta. Color Diferent resta poder. Un resultat negatiu causa Inestabilitat (Dany de retrocés a tu)." },
-      leveling: { title: "Pujar Nivell", text: "Selecciona cartes a la teva mà que sumin 10 o més per Pujar Nivell. Màx Nivell 3. Pujar de nivell augmenta la mida de mà, atacs per torn i desbloqueja habilitats superiors." },
-      abilities: { title: "Habilitats", text: "Pots descartar 1 carta per robar una nova Habilitat. Màxim d'habilitats actives = Nivell + 1. Les habilitats poden ser Passives (sempre actives) o Actives (requieren activació)." }
+      goal: { title: "Objectiu", text: "Derrota l'oponent reduint la seva Vida a 0. Pots atacar directament o utilitzar el Caos del Vòrtex màgic arriscant-te a que el cop torni contra teu." },
+      cards: { title: "Cartes", text: "La baralla consta de cartes Blanques i Negres, dividides en tipus Atac (Llamp) i Defensa (Escut), amb valors de l'1 al 10." },
+      combat: { title: "Lògica de Combat", text: "En Atacar: Si els colors són Oposats (Negre vs Blanc), el resultat del dany és valor d'Atac menys el de la Defensa. Si són el Mateix Color, el dany és Atac menys (Defensa / 2). Si el resultat és negatiu, el dany rebota a l'atacant!" },
+      vortex: { title: "El Vòrtex", text: "Les 4 cartas centrals formen el Vòrtex. Pots utilitzar-les per Atacar o Defensar. El funcionament és: Mateix Color suma poder a la teva carta. Color Diferent resta poder. Un resultat negatiu causa Inestabilitat (Dany de retrocés cap a tu)." },
+      leveling: { title: "Pujar Nivell", text: "Selecciona cartes a la teva mà que sumin un valor de 10 o més per Pujar de Nivell. Màx Nivell és 3. Pujar de nivell augmenta la mida de mà, els atacs per torn i desbloqueja habilitats superiors." },
+      abilities: { title: "Habilitats", text: "Descarta 1 carta per robar Habilitat. Personatges Blancs/Negres Màx Hab = Nivell + 1. Neutrals Màx = Nivell. Les habilitats poden ser Passives o Actives." }
     },
     lore: {
       title: "L'Univers del Vòrtex",
@@ -377,12 +493,12 @@ export const TEXTS = {
     },
     characterLore: {
         char1: "Membre del consell de savis del bosc de les fades. Sacerdot de la Natura, Protector del Bosc i les seves criatures, Jutge i executor dels dictàmens del cercle etern, que governa l'equilibri de tot ésser que s'endinsi en els dominis de Gaia. Poderós personatge, amb una moral i un fort sentit de la ètica i la virtud, sensible a la màgia de la llum, especialment a tot allò que té a veure amb la mare natura i el seu delicat equilibri, evolució i canvi constant.",
-        char2: "Summe Sacerdot dels Escamats, habitant dels Zigurats Maragda en el profund de la selva primigènia. Custodia els antics rituals de sang que mantenen el sol cremant. Líder d'una casta guerrera que creu que la força és l'única veritat absoluta, canalitzant energies fosques per manipular el teixit de la màgia.",
+        char2: "Summe Sacerdot dels Escamats, habitant dels Zigurats Maragda en el profund de la selva primigènia. Custodia els antics rituals de sangre que mantenen el sol cremant. Líder d'una casta guerrera que creu que la força és l'única veritat absoluta, canalitzant energies fosques per manipular el teixit de la màgia.",
         char3: "Serafí de l'Agulla Cristal·lina, descendit dels Cels Alts per purgar la corrupció del Vòrtex. Empunyant una espasa de llum estel·lar pura, jutja els indignes amb imparcial ira divina. Un ésser de puresa absoluta que veu el Vòrtex com una taca en la creació que ha de ser netejada per la Llum.",
         char4: "Arxiduc del Pou d'Obsidiana, un tirà nascut de l'ombra i la malícia que busca tòrcer el Vòrtex per convertir-lo en un portal per a les seves legions infernals. S'alimenta de la desesperació i comanda les arts fosques amb una mestria aterridora, creient que el caos és l'única escala real al poder.",
         char5: "Gran Mestre del Pic Silenciós. Després de meditar durant segles a l'agulla més alta del món, ha assolit l'equilibri perfecte entre cos i esperit. No lluita per destruir, sinó per restaurar el flux de l'harmonia, utilitzant la seva voluntat de ferro per desviar atacs amb la fluïdesa de l'aigua.",
         char6: "Alfa Suprem de l'Eixam. Una màquina de guerra biològica evolucionada per a l'eficiència en un món consumit per eixams. En la seva ment rusc no hi ha 'jo', només la colònia. La màgia és només un altre recurs per collir, i és un depredador implacable adaptado per sobreviure en qualsevol entorn.",
-        char7: "El Senyor Lich de les Criptes. Antany un erudit que temia la mort, ara el seu mestre. Ha sacrificat la seva humanitat per lligar la seva ànima a filactèries de poder fosc. Comanda les arts prohibides per drenar la vida dels seus enemics, demostrant que la mort no és el final, sinó una arma.",
+        char7: "El Senyor Lich de les Criptes. Antany un erudit que temia la mort, ara el seu mestre. Ha sacrificat la seva humanitat per lligar la seva ànima a filactèries de poder fosc. Comanda les arts prohibides per drenar la vida dels seus enemics, demostrando que la mort no és el final, sinó una arma.",
         char8: "Cavaller Comandant de l'Orgull Solar. Un noble guerrer de les ciudadelas de la Sabana Daurada. El seu rugit invoca el coratge dels reis, i la seva espasa brilla amb la fúria del sol de migdia. Guiat per un indestructible codi d'honor, s'erigeix com un far d'esperança contra la foscor invasora.",
         char9: "Veu dels Ancestres. Un guía espiritual dels tròpics exuberants, sintonitzat amb els murmuris de la terra i el cel. Canalitza els tòtems primigenis per veure el que altres no poden, guiant la seva tribu a través del caos amb visions del futur i la saviesa del passat.",
         char10: "Unitat 734-M, La Singularitat. Nascut d'un món on la biologia i els circuits s'han fusionat. Perceb la màgia com algoritmes complexos esperant ser optimitzats. La seva lògica és absoluta, els seus càlculs impecables, i busca descodificar el Vòrtex per actualitzar el sistema operatiu de l'univers.",
@@ -390,26 +506,63 @@ export const TEXTS = {
         char12: "Avatar de la Tempesta Primigènia. Nascut del propi Vòrtex, una convergència caòtica de foc, aigua, terra i aire. No té moralitat, només la força bruta i indòmita de la natura buscant tornar-ho tot al caos elemental. És la tempesta que s'apropa, el terratrèmol que destrueix i el foc que consumeix."
     },
     abilities: {
-        MAGIC_WALL: { name: "Mur Màgic", desc: "Descarta una carta per crear escut permanent." },
-        DARK_DEFENSE: { name: "Defensa Fosca", desc: "Cartes Def Negres +Nivell." },
-        LIGHT_DEFENSE: { name: "Defensa de Llum", desc: "Cartes Def Blanques +Nivell." },
-        PALADIN_OF_LIGHT: { name: "Paladí de Llum", desc: "Cartes Atc Blanques +Nivell." },
-        DARK_LORD: { name: "Senyor Fosc", desc: "Cartes Atc Negres +Nivell." },
-        MAGIC_AFFINITY: { name: "Afinitat Màgica", desc: "Descarta carta. Cura Valor/2 + Nivell." },
-        MAGIC_VISION: { name: "Visió Màgica", desc: "Revela mà de l'oponent." },
-        MAGIC_KNOWLEDGE: { name: "Coneixement Màgic", desc: "Mida Mà Màx +Nivell." },
-        MAGIC_RESISTANCE: { name: "Resistència Màgica", desc: "Vida Màx +10 per Nivell." },
-        MIND_CONTROL: { name: "Control Mental", desc: "Descarta 1. Oponente descarta meitat valor." },
-        ELEMENTAL_CONTROL: { name: "Control Elemental", desc: "Descarta 1. Canvia color carta." },
-        MAGIC_CONTROL: { name: "Control Màgic", desc: "Descarta 1. Canvia tipus carta." },
-        VORTEX_CONTROL: { name: "Control de Vòrtex", desc: "Usa Vòrtex per Defensa 1 cop/torn." },
-        LIGHT_AFFINITY: { name: "Afinitat Llum", desc: "Descarta Blanca. Cura Valor/2 + Nivell." },
-        DARK_AFFINITY: { name: "Afinitat Fosca", desc: "Descarta Negra. Cura Valor/2 + Nivell." },
-        MASTER_CONTROL: { name: "Control Mestre", desc: "Descarta 1. Canvia color o tipus." },
-        DARK_SERVANT: { name: "Servent Fosc", desc: "Redueix Atc Negre entrant a la meitat." },
-        ACOLYTE_OF_LIGHT: { name: "Acòlit de Llum", desc: "Redueix Atc Blanc entrant a la meitat." },
-        MASTER_AFFINITY: { name: "Afinitat Mestra", desc: "Descarta 1. Cura Valor complet." },
-        MASTER_VORTEX: { name: "Vòrtex Mestre", desc: "Usa Vòrtex per Atac il·limitat." }
+        MAGIC_WALL: { name: "Mur Màgic", desc: "Activa. Descarta 1. Crea Escut = Valor Carta." },
+        DARK_DEFENSE: { name: "Defensa Fosca", desc: "Passiva. Cartas Def Negres +Nivell." },
+        LIGHT_DEFENSE: { name: "Defensa de Llum", desc: "Passiva. Cartas Def Blanques +Nivell." },
+        PALADIN_OF_LIGHT: { name: "Paladí de Llum", desc: "Passiva. Cartas Atc Blanques +Nivell." },
+        DARK_LORD: { name: "Senyor Fosc", desc: "Passiva. Cartas Atc Negres +Nivell." },
+        MAGIC_AFFINITY: { name: "Afinitat Màgica", desc: "Activa. Descarta 1. Cura Valor/2 + Nivell." },
+        MAGIC_VISION: { name: "Visió Màgica", desc: "Activa. Descarta 1. Revela mà oponent." },
+        MAGIC_KNOWLEDGE: { name: "Coneixement Màgic", desc: "Passiva. Mida Mà +Nivell." },
+        MAGIC_RESISTANCE: { name: "Resistència Màgica", desc: "Passiva. Vida Màx +10/Nivell." },
+        MIND_CONTROL: { name: "Control Mental", desc: "Activa. Descarta 1. Oponente descarta Nivell." },
+        ELEMENTAL_CONTROL: { name: "Control Elemental", desc: "Activa. Descarta 1. Canvia color carta." },
+        MAGIC_CONTROL: { name: "Control Màgic", desc: "Activa. Descarta 1. Canvia tipus carta." },
+        VORTEX_CONTROL: { name: "Control de Vòrtex", desc: "Passiva. Usa Vòrtex per Defensa 1 cop/torn." },
+        LIGHT_AFFINITY: { name: "Afinitat Llum", desc: "Activa. Descarta Blanca. Cura Valor/2 + Nivell." },
+        DARK_AFFINITY: { name: "Afinitat Fosca", desc: "Activa. Descarta Negra. Cura Valor/2 + Nivell." },
+        MASTER_CONTROL: { name: "Control Mestre", desc: "Activa. Descarta 1. Canvia color i tipus." },
+        DARK_SERVANT: { name: "Servent Fosc", desc: "Passiva. Meitat dany Negre entrant." },
+        ACOLYTE_OF_LIGHT: { name: "Acòlit de Llum", desc: "Passiva. Meitat dany Blanc entrant." },
+        MASTER_AFFINITY: { name: "Afinitat Mestra", desc: "Activa. Descarta 1. Cura Valor complet." },
+        MASTER_VORTEX: { name: "Vòrtex Mestre", desc: "Passiva. Atacs Vòrtex il·limitats." }
+    },
+    abilityDefinitions: {
+      neutral: {
+        title: "HABILITATS NEUTRALS",
+        list: [
+          "🧱 Magic wall (nivell I, Activa): Descarta una carta. Genera un escut permanent que no té color i que té el valor de la carta descartada. El Mur sempre resta l'atac que es rebi, inclòs l'atac rebotat que vingui del VORTEX. Els Mur es va afeblint amb cada ataca fins que es queda a 0. Només es pot activar un mur o escut durant el propi torn. Però un cop un jugador té un mur aquest es queda fins que és destruït. El propi jugador no pot desfer-se del seu escut o mur ni substituir-lo per un altre fins que sigui destruït.",
+          "❤️ Magic Affinity (nivell I, Activa): Descarta una carta. Recupera tants punts de vitalitat com la meitat del valor de la carta descartada més el nivell del jugador. [♥X/2 + LV]",
+          "🪬 Magic Vision (nivell I, Activa): Descarta una carta. Es mostren totes les cartes d'un oponent.",
+          "📖 Magic Knowledge (nivell I, Passiva): Incrementa el màxim nombre permés de cartes a la mà en +1 per nivell. [MAX Cartes + Nv]",
+          "💪 Magic Resistance (nivell I, Passiva): Incrementa el màxim de punts de vitalitat permès en +10 per nivell). [MAX vit ♥ + Nv x10]",
+          "🧠 Mind Control (nivell II, Activa): Descarta una carta. Un oponent es descarta de tantes cartes com Nv del personatge.",
+          "🔄️ Elemental Control (nivell II, Activa): Descarta una carta. Canvia el color d'una carta pròpia. [□ ◄ ► ■]",
+          "🔀 Magic Control (nivell II, Activa): Descarta una carta. Canvia el tipus d'una carta pròpia. [ATK ◄ ► DEF]",
+          "🌀 Vortex Control (nivell II, Passiva): Permet utilitzar el VORTEX en defensa un cop per torn (en els mateixos moments en que es podria defensar el jugador). La mecànica de funcionament del VORTEX és la mateixa que per l'atac.",
+          "♻️ Master Control (nivell III, Activa): Descarta una carta. Canvia el color i el tipus d'una carta pròpia. [□ ◄ ► ■][ATK ◄ ► DEF]",
+          "💖 Master Affinity (nivell III, Activa): Descarta una carta. Recupera tants punts de vitalitat com el valor de la carta descartada.[♥X]",
+          "♾️ Master Vortex (nivell III, Passiva): Permet utilitzar el VORTEX tantes vegades com el jugador vulgui en atac durant el seu torn. És a dir el VORTEX ja no està limitat a una vegada per torn."
+        ]
+      },
+      white: {
+        title: "HABILITATS D'AFINITAT BLANCA",
+        list: [
+          "🛡️ Light Defense (nivell I, Passiva): Incrementa qualsevol carta de defensa blanca en +1 per nivell. [DEF □ + Nv]",
+          "⚔️ Paladin of Light (nivell I, Passiva): Incrementa qualsevol carta d'atac blanca en +1 per nivell. [ATK □ + Nv]",
+          "🤍 Light Affinity (nivell II, Activa): Descarta una carta blanca. Recupera tants punts de vitalitat com la meitat del valor de la carta descartada. [♥X/2 □ + Nv]",
+          "🔆 Acolyte of Light (nivell III, Passiva): Redueix tot el mal d'un atac blanc a la meitat (arrodonint cap a baix). [ATK □ /2]"
+        ]
+      },
+      black: {
+        title: "HABILITATS D'AFINITAT NEGRA",
+        list: [
+          "🛡️ Dark  Defense (nivell I, Passiva): Incrementa qualsevol carta de defensa Negra en +1 per nivell. [DEF ■ + Nv]",
+          "⚔️ Dark Lord (nivell I, Passiva): Incrementa qualsevol carta d'atac negra en +1 per nivell. [ATK ■ + Nv]",
+          "🖤 Dark Affinity (nivell II, Activa): Descarta una carta negra. Recupera tants punts de vitalitat com la meitat del valor de la carta descartada. [♥X/2 ■ + Nv]",
+          "🌑 Dark Servant (nivell III, Passiva): Redueix tot el mal d'un atac negre a la meitat (arrodonint cap a baix). [ATK ■ /2]"
+        ]
+      }
     },
     warnings: {
         levelTooLow: "Nivell insuficient.",
@@ -425,13 +578,14 @@ export const TEXTS = {
         darkAffinityReq: "Afinitat Fosca requereix descartar carta NEGRA.",
         shieldActive: "Escut ja actiu. Ha d'arribar a 0 per reemplaçar.",
         abilityUsed: "Habilitat ja usada aquest torn.",
-        noAbilities: "No hi ha habilitats disponibles pel teu nivell.",
+        noAbilities: "No hi ha habilitats disponibles per a la teva afinitat/nivell.",
         selectAttackCard: "Si us plau, selecciona una carta d'Atac primer.",
-        abilityLimitReached: "Límit d'Habilitats actives assolit (Nivell + 1).",
+        abilityLimitReached: "Límit d'Habilitats actives assolit.",
         selectAttackToExec: "Selecciona una carta d'Atac per executar.",
         selectDiscardForDraw: "Selecciona una carta per descartar.",
-        selectCardsForLevelUp: "Selecciona cartes que sumin 10 o més.",
+        selectCardsForLevelUp: "Selecciona cartes que sumen 10 o més.",
         selectDiscardGeneric: "Selecciona una carta per descartar.",
+        wrongAffinity: "El teu personatge no pot utilitzar aquesta afinitat.",
     },
     logs: {
         turnStart: (p: string) => `--- Inici Torn de ${p} ---`,
@@ -442,7 +596,7 @@ export const TEXTS = {
         discardToAct: (val: number, name: string) => `Descartat ${val} per activar ${name}.`,
         shieldSet: (val: number) => `Escut Permanent fixat a ${val}.`,
         healed: (n: number) => `Curat ${n} HP.`,
-        mindControl: (v: number, n: number) => `Vas descartar ${v}. IA va descartar ${n} cartes.`,
+        mindControl: (v: number, n: number) => `Vas descartar ${v}. IA va descartar ${n} cartas.`,
         selectTarget: "Ara tria carta a la mà per modificar.",
         changedCard: (desc: string) => `Carta canviada: ${desc}`,
         vortexAttack: "Iniciant Atac de Vòrtex...",
@@ -460,12 +614,15 @@ export const TEXTS = {
         vortexDefensePrefix: "DEFENSA VÒRTEX! ",
         vortexHitPrefix: "VÒRTEX! ",
         instabilityPrefix: "INESTABILITAT! ",
-        vortexNeutralized: "VÒRTEX NEUTRALITZAT.",
+        vortexNeutralized: "VÒRTEX NEUTRALIZADO.",
         vs: " vs ",
         atkLabel: "(Atc)",
         defLabel: "(Def)",
         vortexLabel: "(Vòrtex)",
-        discardedGeneric: (val: number, col: string, type: string) => `Descartat ${val} ${col} ${type}.`
+        discardedGeneric: (val: number, col: string, type: string) => `Descartat ${val} ${col} ${type}.`,
+        visionActivated: "Visió Màgica! Mà oponent revelada.",
+        aiLevelsUp: "IA puja de Nivell!",
+        aiDrawsAbility: "IA roba una Habilitat."
     }
   }
 };

@@ -1,4 +1,3 @@
-
 import { FsmState } from './types';
 import type { Card, AbilityCard, GameState, Character } from './types';
 
@@ -33,51 +32,57 @@ export const generateDeck = (): Card[] => {
 };
 
 /**
- * ABILITIES DATA
+ * ABILITIES DATA V2.0
  * Defines the rules and effects for all 20 unique abilities.
- * effectTag is crucial for the game engine to apply the correct logic.
+ * Includes Affinity property.
  */
 export const ABILITIES_LIST: Omit<AbilityCard, 'id'>[] = [
-    // Level 1
-    { name: 'Magic Wall', level: 1, description: 'Discard a card to create a permanent shield.', effectTag: 'MAGIC_WALL' },
-    { name: 'Dark Defense', level: 1, description: 'Black Def cards +Level.', effectTag: 'DARK_DEFENSE' },
-    { name: 'Light Defense', level: 1, description: 'White Def cards +Level.', effectTag: 'LIGHT_DEFENSE' },
-    { name: 'Paladin of Light', level: 1, description: 'White Atk cards +Level.', effectTag: 'PALADIN_OF_LIGHT' },
-    { name: 'Dark Lord', level: 1, description: 'Black Atk cards +Level.', effectTag: 'DARK_LORD' },
-    { name: 'Magic Affinity', level: 1, description: 'Discard a card. Heal Value/2 + Level.', effectTag: 'MAGIC_AFFINITY' },
-    { name: 'Magic Vision', level: 1, description: 'Reveal opponent hand.', effectTag: 'MAGIC_VISION' },
-    { name: 'Magic Knowledge', level: 1, description: 'Max Hand Size +Level.', effectTag: 'MAGIC_KNOWLEDGE' },
-    { name: 'Magic Resistance', level: 1, description: 'Max HP +10 per Level.', effectTag: 'MAGIC_RESISTANCE' },
-    
-    // Level 2
-    { name: 'Mind Control', level: 2, description: 'Discard 1. Opponent discards half value.', effectTag: 'MIND_CONTROL' },
-    { name: 'Elemental Control', level: 2, description: 'Discard 1. Change card color.', effectTag: 'ELEMENTAL_CONTROL' },
-    { name: 'Magic Control', level: 2, description: 'Discard 1. Change card type.', effectTag: 'MAGIC_CONTROL' },
-    { name: 'Vortex Control', level: 2, description: 'Use Vortex for Defense once per turn.', effectTag: 'VORTEX_CONTROL' },
-    { name: 'Light Affinity', level: 2, description: 'Discard White card. Heal Value/2 + Level.', effectTag: 'LIGHT_AFFINITY' },
-    { name: 'Dark Affinity', level: 2, description: 'Discard Black card. Heal Value/2 + Level.', effectTag: 'DARK_AFFINITY' },
+    // NEUTRAL ABILITIES
+    { name: 'Magic Wall', level: 1, description: 'Discard a card to create a permanent shield.', effectTag: 'MAGIC_WALL', affinity: 'NEUTRAL' },
+    { name: 'Magic Affinity', level: 1, description: 'Discard 1. Heal Value/2 + Level.', effectTag: 'MAGIC_AFFINITY', affinity: 'NEUTRAL' },
+    { name: 'Magic Vision', level: 1, description: 'Discard 1. Reveal opponent hand.', effectTag: 'MAGIC_VISION', affinity: 'NEUTRAL' },
+    { name: 'Magic Knowledge', level: 1, description: 'Max Hand Size +Level.', effectTag: 'MAGIC_KNOWLEDGE', affinity: 'NEUTRAL' },
+    { name: 'Magic Resistance', level: 1, description: 'Max HP +10 per Level.', effectTag: 'MAGIC_RESISTANCE', affinity: 'NEUTRAL' },
+    { name: 'Mind Control', level: 2, description: 'Discard 1. Opponent discards N cards.', effectTag: 'MIND_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Elemental Control', level: 2, description: 'Discard 1. Change card color.', effectTag: 'ELEMENTAL_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Magic Control', level: 2, description: 'Discard 1. Change card type.', effectTag: 'MAGIC_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Vortex Control', level: 2, description: 'Use Vortex for Defense once per turn.', effectTag: 'VORTEX_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Master Control', level: 3, description: 'Discard 1. Change color or type.', effectTag: 'MASTER_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Master Affinity', level: 3, description: 'Discard 1. Heal full Value.', effectTag: 'MASTER_AFFINITY', affinity: 'NEUTRAL' },
+    { name: 'Master Vortex', level: 3, description: 'Use Vortex for Attack unlimited times.', effectTag: 'MASTER_VORTEX', affinity: 'NEUTRAL' },
 
-    // Level 3
-    { name: 'Master Control', level: 3, description: 'Discard 1. Change color or type.', effectTag: 'MASTER_CONTROL' },
-    { name: 'Dark Servant', level: 3, description: 'Reduce incoming Black Atk by half.', effectTag: 'DARK_SERVANT' },
-    { name: 'Acolyte of Light', level: 3, description: 'Reduce incoming White Atk by half.', effectTag: 'ACOLYTE_OF_LIGHT' },
-    { name: 'Master Affinity', level: 3, description: 'Discard 1. Heal full Value.', effectTag: 'MASTER_AFFINITY' },
-    { name: 'Master Vortex', level: 3, description: 'Use Vortex for Attack unlimited times.', effectTag: 'MASTER_VORTEX' },
+    // WHITE ABILITIES
+    { name: 'Light Defense', level: 1, description: 'White Def cards +Level.', effectTag: 'LIGHT_DEFENSE', affinity: 'WHITE' },
+    { name: 'Paladin of Light', level: 1, description: 'White Atk cards +Level.', effectTag: 'PALADIN_OF_LIGHT', affinity: 'WHITE' },
+    { name: 'Light Affinity', level: 2, description: 'Discard White card. Heal Value/2 + Level.', effectTag: 'LIGHT_AFFINITY', affinity: 'WHITE' },
+    { name: 'Acolyte of Light', level: 3, description: 'Reduce incoming White Atk by half.', effectTag: 'ACOLYTE_OF_LIGHT', affinity: 'WHITE' },
+
+    // BLACK ABILITIES
+    { name: 'Dark Defense', level: 1, description: 'Black Def cards +Level.', effectTag: 'DARK_DEFENSE', affinity: 'BLACK' },
+    { name: 'Dark Lord', level: 1, description: 'Black Atk cards +Level.', effectTag: 'DARK_LORD', affinity: 'BLACK' },
+    { name: 'Dark Affinity', level: 2, description: 'Discard Black card. Heal Value/2 + Level.', effectTag: 'DARK_AFFINITY', affinity: 'BLACK' },
+    { name: 'Dark Servant', level: 3, description: 'Reduce incoming Black Atk by half.', effectTag: 'DARK_SERVANT', affinity: 'BLACK' }
 ];
 
 /**
  * CHARACTER ROSTER
  * The 12 playable characters with their starting abilities and affinity colors.
+ * ORDERED: White -> Black -> Neutral
  */
 export const CHARACTERS: Character[] = [
+    // WHITE AFFINITY
     { id: 'char1', name: 'Druid', avatar: '🧙‍♂️', startingAbilityTag: 'ELEMENTAL_CONTROL', affinityColor: 'WHITE' },
-    { id: 'char2', name: 'Lizard', avatar: '🦎', startingAbilityTag: 'MAGIC_CONTROL', affinityColor: 'BLACK' },
     { id: 'char3', name: 'Angelus', avatar: '👼', startingAbilityTag: 'LIGHT_AFFINITY', affinityColor: 'WHITE' },
-    { id: 'char4', name: 'Diabolus', avatar: '👿', startingAbilityTag: 'DARK_LORD', affinityColor: 'BLACK' },
     { id: 'char5', name: 'Monk', avatar: '🧘', startingAbilityTag: 'LIGHT_DEFENSE', affinityColor: 'WHITE' },
+    { id: 'char8', name: 'LightingCat', avatar: '🦁', startingAbilityTag: 'PALADIN_OF_LIGHT', affinityColor: 'WHITE' },
+    
+    // BLACK AFFINITY
+    { id: 'char2', name: 'Lizard', avatar: '🦎', startingAbilityTag: 'MAGIC_CONTROL', affinityColor: 'BLACK' },
+    { id: 'char4', name: 'Diabolus', avatar: '👿', startingAbilityTag: 'DARK_LORD', affinityColor: 'BLACK' },
     { id: 'char6', name: 'Insectoid', avatar: '🦟', startingAbilityTag: 'DARK_DEFENSE', affinityColor: 'BLACK' },
     { id: 'char7', name: 'Necro', avatar: '💀', startingAbilityTag: 'DARK_AFFINITY', affinityColor: 'BLACK' },
-    { id: 'char8', name: 'LightingCat', avatar: '🦁', startingAbilityTag: 'PALADIN_OF_LIGHT', affinityColor: 'WHITE' },
+
+    // NEUTRAL AFFINITY
     { id: 'char9', name: 'Shaman', avatar: '👺', startingAbilityTag: 'MAGIC_VISION', affinityColor: 'NEUTRAL' },
     { id: 'char10', name: 'Techno', avatar: '🤖', startingAbilityTag: 'MAGIC_KNOWLEDGE', affinityColor: 'NEUTRAL' },
     { id: 'char11', name: 'Mystic', avatar: '🔮', startingAbilityTag: 'MAGIC_WALL', affinityColor: 'NEUTRAL' },
@@ -116,17 +121,24 @@ export const getAbilityByTag = (tag: string): AbilityCard | undefined => {
 /**
  * INITIAL STATE FACTORY
  * Resets the game to a clean slate.
- * Players start at Level 1, characters are null (until selection).
+ * round: Determines AI starting stats.
  */
-export const createInitialState = (): GameState => {
+export const createInitialState = (round: number = 1): GameState => {
   const deck = generateDeck();
   const abilities = generateAbilityDeck();
+
+  // Round Logic
+  // Round 1 (Initial): 40 HP
+  // Round 2 (Intermediate): 50 HP
+  // Round 3 (Advanced): 60 HP
+  const aiHp = round === 1 ? 40 : round === 2 ? 50 : 60;
 
   return {
     gameStatus: 'PRE_GAME',
     fsmState: FsmState.INIT,
     currentPlayer: 'PLAYER',
     winner: null,
+    round: round,
     players: {
       PLAYER: {
         id: 'PLAYER',
@@ -139,6 +151,7 @@ export const createInitialState = (): GameState => {
         activeAbilities: [], 
         permanentShield: null,
         levelUpProgress: 0,
+        isHandRevealed: false,
         usedAbilitiesThisTurn: [],
         attacksPerformed: 0,
         vortexAttacksPerformed: 0,
@@ -148,14 +161,15 @@ export const createInitialState = (): GameState => {
       AI: {
         id: 'AI',
         character: null, // Assigned in selection phase
-        life: INITIAL_LIFE,
-        level: 1,
+        life: aiHp,
+        level: 1, // AI Always starts at 1, but intermediate/advanced can level up
         maxHandSize: MAX_HAND_SIZE, 
         powerHand: [],
         abilityHand: [],
         activeAbilities: [],
         permanentShield: null,
         levelUpProgress: 0,
+        isHandRevealed: false,
         usedAbilitiesThisTurn: [],
         attacksPerformed: 0,
         vortexAttacksPerformed: 0,
