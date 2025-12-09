@@ -1,17 +1,17 @@
 🌀 Magical Vortex: The Card Game
 
-	Web app Game based on a 2002 early concept I created for a Fast paced Duel Card Game in a Magic Fantasy world.
+Web app Game based on a 2002 early concept I created for a Fast paced Duel Card Game in a Magic Fantasy world.
 
 📖 About The Project
 
-	Welcome to the Universe of the Vortex. In this world, magic is a fundamental force and the origin of all things. However, the balance has been shattered. An astronomical Magic Vortex has appeared, threatening to consume existence itself.
-	This web application brings to life a strategic card battling system where players must master the duality of White and Black magic. You must channel primordial energies, exploit elemental affinities, and manipulate the chaotic Vortex to survive.
-	Will you save the universe, or become the last survivor of its end?
+Welcome to the Universe of the Vortex. In this world, magic is a fundamental force and the origin of all things. However, the balance has been shattered. An astronomical Magic Vortex has appeared, threatening to consume existence itself.
+This web application brings to life a strategic card battling system where players must master the duality of White and Black magic. You must channel primordial energies, exploit elemental affinities, and manipulate the chaotic Vortex to survive.
+Will you save the universe, or become the last survivor of its end?
 
 🎮 Gameplay & Mechanics
 
 The Objective
-	Defeat your opponent by reducing their Vitality (HP) to 0. You can attack directly or take a risk by utilizing the chaotic power of the Vortex, where power can turn against the user.
+Defeat your opponent by reducing their Vitality (HP) to 0. You can attack directly or take a risk by utilizing the chaotic power of the Vortex, where power can turn against the user.
 
 🃏 The Cards
 
