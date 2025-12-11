@@ -1,3 +1,4 @@
+
 import { FsmState } from './types';
 import type { Card, AbilityCard, GameState, Character } from './types';
 
@@ -38,30 +39,32 @@ export const generateDeck = (): Card[] => {
  */
 export const ABILITIES_LIST: Omit<AbilityCard, 'id'>[] = [
     // NEUTRAL ABILITIES
-    { name: 'Magic Wall', level: 1, description: 'Discard a card to create a permanent shield.', effectTag: 'MAGIC_WALL', affinity: 'NEUTRAL' },
-    { name: 'Magic Affinity', level: 1, description: 'Discard 1. Heal Value/2 + Level.', effectTag: 'MAGIC_AFFINITY', affinity: 'NEUTRAL' },
-    { name: 'Magic Vision', level: 1, description: 'Discard 1. Reveal opponent hand.', effectTag: 'MAGIC_VISION', affinity: 'NEUTRAL' },
-    { name: 'Magic Knowledge', level: 1, description: 'Max Hand Size +Level.', effectTag: 'MAGIC_KNOWLEDGE', affinity: 'NEUTRAL' },
-    { name: 'Magic Resistance', level: 1, description: 'Max HP +10 per Level.', effectTag: 'MAGIC_RESISTANCE', affinity: 'NEUTRAL' },
-    { name: 'Mind Control', level: 2, description: 'Discard 1. Opponent discards N cards.', effectTag: 'MIND_CONTROL', affinity: 'NEUTRAL' },
-    { name: 'Elemental Control', level: 2, description: 'Discard 1. Change card color.', effectTag: 'ELEMENTAL_CONTROL', affinity: 'NEUTRAL' },
-    { name: 'Magic Control', level: 2, description: 'Discard 1. Change card type.', effectTag: 'MAGIC_CONTROL', affinity: 'NEUTRAL' },
-    { name: 'Vortex Control', level: 2, description: 'Use Vortex for Defense once per turn.', effectTag: 'VORTEX_CONTROL', affinity: 'NEUTRAL' },
-    { name: 'Master Control', level: 3, description: 'Discard 1. Change color or type.', effectTag: 'MASTER_CONTROL', affinity: 'NEUTRAL' },
-    { name: 'Master Affinity', level: 3, description: 'Discard 1. Heal full Value.', effectTag: 'MASTER_AFFINITY', affinity: 'NEUTRAL' },
-    { name: 'Master Vortex', level: 3, description: 'Use Vortex for Attack unlimited times.', effectTag: 'MASTER_VORTEX', affinity: 'NEUTRAL' },
+    { name: 'Magic Wall', icon: '🧱', level: 1, description: 'Discard a card to create a permanent shield.', effectTag: 'MAGIC_WALL', affinity: 'NEUTRAL' },
+    // DISABLED: Magic Affinity
+    // { name: 'Magic Affinity', icon: '❤️', level: 1, description: 'Discard 1. Heal Value/2 + Level.', effectTag: 'MAGIC_AFFINITY', affinity: 'NEUTRAL' },
+    { name: 'Magic Vision', icon: '🪬', level: 1, description: 'Discard 1. Reveal opponent hand.', effectTag: 'MAGIC_VISION', affinity: 'NEUTRAL' },
+    { name: 'Magic Knowledge', icon: '📖', level: 1, description: 'Max Hand Size +Level.', effectTag: 'MAGIC_KNOWLEDGE', affinity: 'NEUTRAL' },
+    { name: 'Magic Resistance', icon: '💪', level: 1, description: 'Max HP +10 per Level.', effectTag: 'MAGIC_RESISTANCE', affinity: 'NEUTRAL' },
+    { name: 'Mind Control', icon: '🧠', level: 2, description: 'Discard 1. Opponent discards N cards.', effectTag: 'MIND_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Elemental Control', icon: '🔄️', level: 2, description: 'Discard 1. Change card color.', effectTag: 'ELEMENTAL_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Magic Control', icon: '🔀', level: 2, description: 'Discard 1. Change card type.', effectTag: 'MAGIC_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Vortex Control', icon: '🌀', level: 2, description: 'Use Vortex for Defense once per turn.', effectTag: 'VORTEX_CONTROL', affinity: 'NEUTRAL' },
+    // DISABLED: Master Control
+    // { name: 'Master Control', icon: '♻️', level: 3, description: 'Discard 1. Change color or type.', effectTag: 'MASTER_CONTROL', affinity: 'NEUTRAL' },
+    { name: 'Master Affinity', icon: '💖', level: 3, description: 'Discard 1. Heal full Value.', effectTag: 'MASTER_AFFINITY', affinity: 'NEUTRAL' },
+    { name: 'Master Vortex', icon: '♾️', level: 3, description: 'Use Vortex for Attack unlimited times.', effectTag: 'MASTER_VORTEX', affinity: 'NEUTRAL' },
 
     // WHITE ABILITIES
-    { name: 'Light Defense', level: 1, description: 'White Def cards +Level.', effectTag: 'LIGHT_DEFENSE', affinity: 'WHITE' },
-    { name: 'Paladin of Light', level: 1, description: 'White Atk cards +Level.', effectTag: 'PALADIN_OF_LIGHT', affinity: 'WHITE' },
-    { name: 'Light Affinity', level: 2, description: 'Discard White card. Heal Value/2 + Level.', effectTag: 'LIGHT_AFFINITY', affinity: 'WHITE' },
-    { name: 'Acolyte of Light', level: 3, description: 'Reduce incoming White Atk by half.', effectTag: 'ACOLYTE_OF_LIGHT', affinity: 'WHITE' },
+    { name: 'Light Defense', icon: '🛡️', level: 1, description: 'White Def cards +Level.', effectTag: 'LIGHT_DEFENSE', affinity: 'WHITE' },
+    { name: 'Paladin of Light', icon: '⚔️', level: 1, description: 'White Atk cards +Level.', effectTag: 'PALADIN_OF_LIGHT', affinity: 'WHITE' },
+    { name: 'Light Affinity', icon: '🤍', level: 2, description: 'Discard White card. Heal Value/2 + Level.', effectTag: 'LIGHT_AFFINITY', affinity: 'WHITE' },
+    { name: 'Acolyte of Light', icon: '🔆', level: 3, description: 'Reduce incoming White Atk by half.', effectTag: 'ACOLYTE_OF_LIGHT', affinity: 'WHITE' },
 
     // BLACK ABILITIES
-    { name: 'Dark Defense', level: 1, description: 'Black Def cards +Level.', effectTag: 'DARK_DEFENSE', affinity: 'BLACK' },
-    { name: 'Dark Lord', level: 1, description: 'Black Atk cards +Level.', effectTag: 'DARK_LORD', affinity: 'BLACK' },
-    { name: 'Dark Affinity', level: 2, description: 'Discard Black card. Heal Value/2 + Level.', effectTag: 'DARK_AFFINITY', affinity: 'BLACK' },
-    { name: 'Dark Servant', level: 3, description: 'Reduce incoming Black Atk by half.', effectTag: 'DARK_SERVANT', affinity: 'BLACK' }
+    { name: 'Dark Defense', icon: '🛡️', level: 1, description: 'Black Def cards +Level.', effectTag: 'DARK_DEFENSE', affinity: 'BLACK' },
+    { name: 'Dark Lord', icon: '⚔️', level: 1, description: 'Black Atk cards +Level.', effectTag: 'DARK_LORD', affinity: 'BLACK' },
+    { name: 'Dark Affinity', icon: '🖤', level: 2, description: 'Discard Black card. Heal Value/2 + Level.', effectTag: 'DARK_AFFINITY', affinity: 'BLACK' },
+    { name: 'Dark Servant', icon: '🌑', level: 3, description: 'Reduce incoming Black Atk by half.', effectTag: 'DARK_SERVANT', affinity: 'BLACK' }
 ];
 
 /**
@@ -155,6 +158,7 @@ export const createInitialState = (round: number = 1): GameState => {
         usedAbilitiesThisTurn: [],
         attacksPerformed: 0,
         vortexAttacksPerformed: 0,
+        vortexDefensesPerformed: 0, // NEW: Counter
         levelUpsPerformed: 0,
         abilitiesDrawnThisTurn: 0
       },
@@ -173,6 +177,7 @@ export const createInitialState = (round: number = 1): GameState => {
         usedAbilitiesThisTurn: [],
         attacksPerformed: 0,
         vortexAttacksPerformed: 0,
+        vortexDefensesPerformed: 0,
         levelUpsPerformed: 0,
         abilitiesDrawnThisTurn: 0
       }

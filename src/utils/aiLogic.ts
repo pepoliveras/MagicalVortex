@@ -179,7 +179,7 @@ export const getAiDefenseCard = (
                 }
             }
         }
-        return bestCard;
+        return bestCard || defCards[0]; // Fallback to first available if simulation logic fails to find 'better'
     }
 
     return defCards[0]; // Fallback

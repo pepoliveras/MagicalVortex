@@ -61,6 +61,7 @@ export const getModifiedValue = (card: Card, player: Player): number => {
 /**
  * DIRECT COMBAT CALCULATION
  * Handles Attack vs Defense card logic.
+ * LOGIC: Combat Result first, THEN Shield absorption.
  */
 export const calculateDirectDamage = (
   attackCard: Card,
@@ -70,91 +71,92 @@ export const calculateDirectDamage = (
   lang: Language = 'en'
 ): DamageResult => {
   let attackValue = getModifiedValue(attackCard, attacker);
-  const log = TEXTS[lang].logs;
+  // DEFENSIVE: Fallback to 'en'
+  const log = (TEXTS[lang] || TEXTS['en']).logs;
   
   // --- DEFENSIVE DEBUFFS (Level 3) ---
-  // Dark Servant: Reduce Black Atk / 2
   if (attackCard.color === 'BLACK' && defender.activeAbilities.some(a => a.effectTag === 'DARK_SERVANT')) {
       attackValue = Math.floor(attackValue / 2);
   }
-  // Acolyte of Light: Reduce White Atk / 2
   if (attackCard.color === 'WHITE' && defender.activeAbilities.some(a => a.effectTag === 'ACOLYTE_OF_LIGHT')) {
       attackValue = Math.floor(attackValue / 2);
   }
 
-  // --- 1. CALCULATE COMBAT MATH FIRST ---
-  let combatDamage = 0; // Positive = Defender Damage, Negative = Attacker Recoil
-  let logMath = "";
+  // --- 1. RESOLVE COMBAT MATH (Attack vs Defense) ---
+  let combatDamage = 0; // Positive = Damage to Defender. Negative = Damage to Attacker.
+  let calculationLog = "";
 
   if (!defenseCard) {
-      combatDamage = attackValue;
-      logMath = `${attacker.id}: ${attackValue} ${log.vs} ${log.noDef}`;
+    combatDamage = attackValue;
+    calculationLog = `${attacker.id}: ${attackValue} ${log.vs} ${log.noDef}`;
   } else {
-      const defenseValue = getModifiedValue(defenseCard, defender);
-      
-      if (attackCard.color !== defenseCard.color) {
-        // Opposite Colors: Atk - Def
-        combatDamage = attackValue - defenseValue;
-        logMath = `${attackValue} ${log.atkLabel} - ${defenseValue} ${log.defLabel}`;
-      } else {
-        // Same Color: Atk - floor(Def/2)
-        const effectiveDef = Math.floor(defenseValue / 2);
-        combatDamage = attackValue - effectiveDef;
-        logMath = `${attackValue} ${log.atkLabel} - ${effectiveDef} [${defenseValue}/2] ${log.defLabel}`;
-      }
+    const defenseValue = getModifiedValue(defenseCard, defender);
+    
+    if (attackCard.color !== defenseCard.color) {
+      // Opposite Colors: Atk - Def
+      combatDamage = attackValue - defenseValue;
+      calculationLog = `${attackValue} ${log.atkLabel} - ${defenseValue} ${log.defLabel}`;
+    } else {
+      // Same Color: Atk - floor(Def/2)
+      const effectiveDef = Math.floor(defenseValue / 2);
+      combatDamage = attackValue - effectiveDef;
+      calculationLog = `${attackValue} ${log.atkLabel} - ${effectiveDef} [${defenseValue}/2] ${log.defLabel}`;
+    }
   }
 
-  // --- 2. APPLY SHIELD LOGIC TO RESULT ---
-  // Shield acts as a screen absorbing damage to the target
-  
+  // --- 2. APPLY MAGIC WALL (SHIELD) AFTER MATH ---
+  // If result is Positive, Defender takes damage -> Check Defender's Shield
+  // If result is Negative, Attacker takes damage -> Check Attacker's Shield
+
   if (combatDamage > 0) {
-    // DEFENDER TAKES DAMAGE
-    let finalDamage = combatDamage;
-    let currentShield = defender.permanentShield ? defender.permanentShield.value : 0;
-    let shieldMsg = "";
+      // Damage to Defender
+      let finalDamage = combatDamage;
+      let currentShield = defender.permanentShield ? defender.permanentShield.value : 0;
+      let shieldMsg = "";
 
-    if (currentShield > 0) {
-        const absorbed = Math.min(currentShield, finalDamage);
-        currentShield -= absorbed;
-        finalDamage -= absorbed;
-        shieldMsg = ` ${log.shieldAbsorb(absorbed)}`;
-    }
+      if (currentShield > 0) {
+          const absorbed = Math.min(currentShield, finalDamage);
+          currentShield -= absorbed;
+          finalDamage -= absorbed;
+          shieldMsg = ` ${log.shieldAbsorb(absorbed)}`;
+      }
 
-    return {
-        damage: finalDamage,
-        targetId: defender.id,
-        logMessage: `${logMath} = ${finalDamage > 0 ? log.damage(finalDamage, defender.id) : log.blocked}${shieldMsg}`,
-        shieldRemaining: currentShield
-    };
+      return {
+          damage: finalDamage,
+          targetId: defender.id,
+          logMessage: `${calculationLog} = ${finalDamage > 0 ? log.damage(finalDamage, defender.id) : log.blocked}${shieldMsg}`,
+          shieldRemaining: currentShield
+      };
 
   } else if (combatDamage < 0) {
-    // BOUNCE BACK: ATTACKER TAKES DAMAGE
-    let recoil = Math.abs(combatDamage);
-    let currentShield = attacker.permanentShield ? attacker.permanentShield.value : 0;
-    let shieldMsg = "";
+      // Recoil to Attacker (Instability / Bounce)
+      let recoil = Math.abs(combatDamage);
+      let finalDamage = recoil;
+      let currentShield = attacker.permanentShield ? attacker.permanentShield.value : 0;
+      let shieldMsg = "";
 
-    if (currentShield > 0) {
-        const absorbed = Math.min(currentShield, recoil);
-        currentShield -= absorbed;
-        recoil -= absorbed;
-        shieldMsg = ` ${log.shieldAbsorb(absorbed)}`;
-    }
+      if (currentShield > 0) {
+          const absorbed = Math.min(currentShield, finalDamage);
+          currentShield -= absorbed;
+          finalDamage -= absorbed;
+          shieldMsg = ` ${log.shieldAbsorb(absorbed)}`;
+      }
 
-    return {
-        damage: recoil,
-        targetId: attacker.id,
-        logMessage: `${logMath}. ${log.bounce(recoil, attacker.id)}${shieldMsg}`,
-        shieldRemaining: currentShield
-    };
+      return {
+          damage: finalDamage,
+          targetId: attacker.id,
+          logMessage: `${calculationLog}. ${log.bounce(recoil, attacker.id)}${shieldMsg}`,
+          shieldRemaining: currentShield
+      };
 
   } else {
-    // EXACT BLOCK (0 Damage)
-    return {
-      damage: 0,
-      targetId: null,
-      logMessage: `${log.blocked} ${logMath} = 0.`,
-      shieldRemaining: defender.permanentShield ? defender.permanentShield.value : 0
-    };
+      // EXACT BLOCK (0 Damage)
+      return {
+          damage: 0,
+          targetId: null,
+          logMessage: `${log.blocked} ${calculationLog} = 0.`,
+          shieldRemaining: defender.permanentShield ? defender.permanentShield.value : 0
+      };
   }
 };
 
@@ -172,28 +174,30 @@ export const calculateVortexDamage = (
 ): DamageResult => {
     let attackValue = getModifiedValue(attackCard, attacker);
     const vortexValue = vortexCard.value;
-    const log = TEXTS[lang].logs;
+    // DEFENSIVE: Fallback to 'en'
+    const log = (TEXTS[lang] || TEXTS['en']).logs;
     
-    // --- 1. CALCULATE VORTEX MATH FIRST ---
+    // --- 1. RESOLVE VORTEX MATH ---
     let combatDamage = 0;
-    let logMath = "";
+    let calculationLog = "";
 
+    // Vortex Math Logic
     if (attackCard.color === vortexCard.color) {
         combatDamage = attackValue + vortexValue;
-        logMath = `${attackValue} ${log.atkLabel} + ${vortexValue} ${log.vortexLabel}`;
+        calculationLog = `${attackValue} ${log.atkLabel} + ${vortexValue} ${log.vortexLabel}`;
     } else {
         combatDamage = attackValue - vortexValue;
-        logMath = `${attackValue} ${log.atkLabel} - ${vortexValue} ${log.vortexLabel}`;
+        calculationLog = `${attackValue} ${log.atkLabel} - ${vortexValue} ${log.vortexLabel}`;
     }
 
-    // --- 2. APPLY SHIELD LOGIC ---
+    // --- 2. APPLY MAGIC WALL (SHIELD) ---
     
     if (combatDamage > 0) {
-        // HIT DEFENDER
+        // Positive result: Hit the defender
         let finalDamage = combatDamage;
         let currentShield = defender.permanentShield ? defender.permanentShield.value : 0;
         let shieldMsg = "";
-        
+
         if (currentShield > 0) {
             const absorbed = Math.min(currentShield, finalDamage);
             currentShield -= absorbed;
@@ -204,36 +208,37 @@ export const calculateVortexDamage = (
         return {
             damage: finalDamage,
             targetId: defender.id,
-            logMessage: `${log.vortexHitPrefix}${logMath} = ${log.damage(finalDamage, defender.id)}${shieldMsg}`,
+            logMessage: `${log.vortexHitPrefix}${calculationLog} = ${finalDamage > 0 ? log.damage(finalDamage, defender.id) : log.blocked}${shieldMsg}`,
             shieldRemaining: currentShield
         };
-
+       
     } else if (combatDamage < 0) {
-        // NEGATIVE RESULT: RECOIL ON ATTACKER
+        // Negative result: Instability / Recoil on Attacker
         let recoil = Math.abs(combatDamage);
+        let finalDamage = recoil;
         let currentShield = attacker.permanentShield ? attacker.permanentShield.value : 0;
         let shieldMsg = "";
 
         if (currentShield > 0) {
-            const absorbed = Math.min(currentShield, recoil);
+            const absorbed = Math.min(currentShield, finalDamage);
             currentShield -= absorbed;
-            recoil -= absorbed;
+            finalDamage -= absorbed;
             shieldMsg = ` ${log.shieldAbsorb(absorbed)}`;
         }
 
         return {
-            damage: recoil,
+            damage: finalDamage,
             targetId: attacker.id,
-            logMessage: `${log.instabilityPrefix}${logMath}. ${log.bounce(recoil, attacker.id)}${shieldMsg}`,
+            logMessage: `${log.instabilityPrefix}${calculationLog}. ${log.bounce(recoil, attacker.id)}${shieldMsg}`,
             shieldRemaining: currentShield
         };
 
     } else {
-        // NEUTRALIZED
+        // 0 Damage
         return {
             damage: 0,
             targetId: null,
-            logMessage: `${log.vortexNeutralized} ${logMath} = 0.`,
+            logMessage: `${log.vortexNeutralized} ${calculationLog} = 0.`,
             shieldRemaining: defender.permanentShield ? defender.permanentShield.value : 0
         };
     }

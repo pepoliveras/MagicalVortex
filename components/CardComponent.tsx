@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import type { Card } from '../types';
 
@@ -9,18 +8,14 @@ interface CardProps {
   isSelected?: boolean;
   isFaceDown?: boolean;
   disabled?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  variant?: 'standard' | 'vortex'; // NEW: Determine visual style of card back
+  size?: 'sm' | 'md' | 'lg'; // Kept for font-scaling logic, not dimensions
+  variant?: 'standard' | 'vortex';
 }
 
 /**
  * CARD COMPONENT
  * Renders a single playing card (Attack or Defense).
- * Handles:
- * - Face Down state (standard or vortex back)
- * - Color styling (Black/White)
- * - Selection glow effects
- * - Disabled state
+ * NOW FLUID: Fits the dimensions of its parent container.
  */
 const CardComponent: React.FC<CardProps> = ({ 
   card, 
@@ -32,6 +27,11 @@ const CardComponent: React.FC<CardProps> = ({
   variant = 'standard'
 }) => {
   
+  // Font scaling based on size prop (parent can still dictate 'density' of text)
+  const fontBase = size === 'sm' ? 'text-xs' : 'text-sm sm:text-lg';
+  const iconSize = size === 'sm' ? 'text-xl' : 'text-2xl sm:text-4xl';
+  const tagSize = size === 'sm' ? 'text-[8px]' : 'text-[8px] sm:text-[10px]';
+
   // Render Face Down (Card Back)
   if (isFaceDown) {
     if (variant === 'vortex') {
@@ -39,8 +39,7 @@ const CardComponent: React.FC<CardProps> = ({
         return (
             <div 
                 className={`
-                  relative rounded-lg border-2 border-green-900 bg-black shadow-md shadow-green-900/40
-                  ${size === 'md' ? 'w-24 h-36' : 'w-16 h-24'}
+                  relative w-full h-full rounded-lg border-2 border-green-900 bg-black shadow-md shadow-green-900/40
                   ${!disabled && onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''}
                   flex items-center justify-center overflow-hidden
                 `}
@@ -53,8 +52,8 @@ const CardComponent: React.FC<CardProps> = ({
                 <div className="absolute inset-1 rounded-lg bg-black/80"></div>
 
                 {/* Center Badge */}
-                <div className="relative z-10 w-16 h-16 rounded-full border border-green-700/50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="text-green-500 font-cinzel text-[28px] font-bold tracking-widest opacity-80">🌀</div>
+                <div className="relative z-10 w-2/3 aspect-square rounded-full border border-green-700/50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="text-green-500 font-cinzel text-xl sm:text-3xl font-bold tracking-widest opacity-80">🌀</div>
                 </div>
             </div>
         );
@@ -64,14 +63,13 @@ const CardComponent: React.FC<CardProps> = ({
     return (
       <div 
         className={`
-          relative rounded-lg border-2 border-slate-700 bg-slate-800 shadow-md
-          ${size === 'md' ? 'w-24 h-36' : 'w-16 h-24'}
+          relative w-full h-full rounded-lg border-2 border-slate-700 bg-slate-800 shadow-md
           ${!disabled && onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400' : ''}
           flex items-center justify-center
         `}
         onClick={!disabled ? onClick : undefined}
       >
-        <div className="w-8 h-8 rounded-full border-2 border-slate-600 bg-slate-700"></div>
+        <div className="w-1/3 aspect-square rounded-full border-2 border-slate-600 bg-slate-700"></div>
       </div>
     );
   }
@@ -96,30 +94,29 @@ const CardComponent: React.FC<CardProps> = ({
       onClick={!disabled ? onClick : undefined}
       className={`
         ${bgColor} ${textColor} ${selectionClass} ${opacityClass}
-        relative flex flex-col items-center justify-between p-2 rounded-lg border-2 select-none
-        ${size === 'md' ? 'w-24 h-36' : 'w-16 h-24'}
+        relative w-full h-full flex flex-col items-center justify-between p-1 sm:p-2 rounded-lg border-2 select-none
         transition-all duration-200
       `}
     >
       {/* Top Left Value */}
-      <div className="self-start text-lg font-bold leading-none">
+      <div className={`self-start ${fontBase} font-bold leading-none`}>
         {card.value}
-        <span className="block text-[10px] opacity-70">{Math.floor(card.value/2)}</span>
+        <span className="block text-[0.6em] opacity-70">{Math.floor(card.value/2)}</span>
       </div>
 
       {/* Center Icon */}
-      <div className="text-4xl absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+      <div className={`${iconSize} absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2`}>
         {icon}
       </div>
 
       {/* Bottom Right Value (Inverted) */}
-      <div className="self-end transform rotate-180 text-lg font-bold leading-none">
+      <div className={`self-end transform rotate-180 ${fontBase} font-bold leading-none`}>
         {card.value}
       </div>
       
       {/* Type Tag (ATK/DEF) */}
       <div className={`
-        absolute bottom-1 left-1/2 transform -translate-x-1/2 text-[10px] font-bold tracking-widest px-1 rounded
+        absolute bottom-[5%] left-1/2 transform -translate-x-1/2 ${tagSize} font-bold tracking-widest px-1 rounded
         ${isBlack ? 'bg-slate-800 text-slate-300' : 'bg-slate-300 text-slate-800'}
       `}>
         {card.type}

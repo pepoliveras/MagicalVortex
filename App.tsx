@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FsmState } from './types';
 import type { GameState, Card, PlayerId, AbilityCard, Character, Language } from './types';
@@ -7,7 +8,7 @@ import { getAiLevelUpCards, getAiAbilityDiscard, getAiAttackCard, getAiDefenseCa
 import GameBoard from './components/GameBoard';
 import GameLog from './components/GameLog';
 import EndGameEffects from './components/EndGameEffects';
-import { TEXTS, getTransAbility } from './translations';
+import { TEXTS, getTransAbility, Translation } from './translations';
 
 /**
  * APP COMPONENT (CONTROLLER)
@@ -19,7 +20,10 @@ import { TEXTS, getTransAbility } from './translations';
  * 5. Combat Resolution
  */
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
+  // Debug Log
+  console.log("V2.1: Features Disabled (Affinity/Master)");
+
   const [language, setLanguage] = useState<Language>('ca');
   const [gameState, setGameState] = useState<GameState>(createInitialState());
   
@@ -44,9 +48,31 @@ const App: React.FC = () => {
   // NEW: State for Character Lore Modal
   const [viewingCharacter, setViewingCharacter] = useState<Character | null>(null);
 
-  // Shortcut for text access
-  const txt = TEXTS[language];
+  // Shortcut for text access - DEFENSIVE
+  const currentTexts = TEXTS[language] || TEXTS['en'];
+  if (!currentTexts) {
+      console.error("Critical Error: Missing translations for language", language);
+      return <div className="p-10 text-red-500 font-bold">Error loading translations. Please refresh.</div>;
+  }
+  const txt = currentTexts;
   const ui = txt.ui;
+
+  // --- HELPER: FIND FULL ABILITY DESC ---
+  const findFullAbilityDescription = (tag: string): string => {
+      const defs = txt.abilityDefinitions;
+      const categories: (keyof typeof defs)[] = ['neutral', 'white', 'black'];
+      
+      for (const cat of categories) {
+          const levels = defs[cat].levels;
+          // Iterate over levels 1, 2, 3
+          for (const lvl of [1, 2, 3] as const) {
+             const abilities = levels[lvl];
+             const found = abilities.find(a => a.tag === tag);
+             if (found) return found.desc;
+          }
+      }
+      return getTransAbility(tag, language).desc;
+  };
 
   // --- HELPER: ADD LOG ---
   // Appends a message to the game log for the UI
@@ -58,6 +84,9 @@ const App: React.FC = () => {
   const executeGenericDiscard = (cardId: string) => {
       setGameState(prev => {
           const player = { ...prev.players.PLAYER };
+          // FIX: Shallow copy array to avoid mutation of state
+          player.powerHand = [...player.powerHand];
+          
           const cardIndex = player.powerHand.findIndex(c => c.id === cardId);
           if (cardIndex === -1) return prev;
           const discarded = player.powerHand.splice(cardIndex, 1)[0];
@@ -78,6 +107,7 @@ const App: React.FC = () => {
   // Re-used for both Immediate Draw (Card pre-selected) and Delayed Draw (Card clicked later)
   const executeAbilityDraw = (cardIdToDiscard: string) => {
       // Capture discarded value before state update to ensure it's available for the delayed log
+      // Safe check: Player hand might change if rapid clicks occur, though blocked by FSM usually.
       const cardToDiscard = gameState.players.PLAYER.powerHand.find(c => c.id === cardIdToDiscard);
       if (!cardToDiscard) return;
       const discardedVal = cardToDiscard.value;
@@ -85,6 +115,9 @@ const App: React.FC = () => {
       setGameState(prev => {
           // PHASE 1: DISCARD
           const newPlayer = { ...prev.players.PLAYER };
+          // FIX: Clone array to avoid mutation
+          newPlayer.powerHand = [...newPlayer.powerHand];
+          
           const discardIndex = newPlayer.powerHand.findIndex(c => c.id === cardIdToDiscard);
           if (discardIndex === -1) return prev;
 
@@ -163,30 +196,57 @@ const App: React.FC = () => {
           let result;
           if (pending.type === 'VORTEX_ATTACK') {
                const vIndex = pending.vortexCardIndex!;
-               const vCard = prev.vortexCards[vIndex]!;
+               const vCard = prev.vortexCards[vIndex];
+               // Safety check for null vortex card
+               if (!vCard) {
+                   return { ...prev, fsmState: FsmState.MAIN_PHASE, pendingAction: { ...prev.pendingAction, vortexCardIndex: null } };
+               }
                result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
           } else {
               if (pending.vortexDefenseIndex !== null) {
-                  const vCard = prev.vortexCards[pending.vortexDefenseIndex]!;
+                  const vCard = prev.vortexCards[pending.vortexDefenseIndex];
+                  // Safety check
+                  if (!vCard) {
+                       return { ...prev, fsmState: FsmState.RESOLVE_DIRECT_COMBAT, pendingAction: { ...prev.pendingAction, vortexDefenseIndex: null } };
+                  }
                   result = calculateVortexDamage(pending.attackingCard!, vCard, attacker, defender, language);
                   result.logMessage = txt.logs.vortexDefensePrefix + result.logMessage;
               } else {
                   result = calculateDirectDamage(pending.attackingCard!, pending.defendingCard, attacker, defender, language);
               }
           }
+
+          // IMMUTABLE UPDATE
           const newPlayers = { ...prev.players };
           if (result.targetId) {
-              const target = newPlayers[result.targetId];
+              const targetId = result.targetId;
+              const originalTarget = newPlayers[targetId];
+              // Clone the player object to avoid mutation
+              const newTarget = { 
+                  ...originalTarget,
+                  permanentShield: originalTarget.permanentShield ? { ...originalTarget.permanentShield } : null
+              };
+              
               // 1. Update HP
-              target.life = Math.max(0, target.life - result.damage);
+              newTarget.life = Math.max(0, newTarget.life - result.damage);
               
               // 2. Update Shield for the specific target that took damage (could be defender OR attacker on recoil)
-              if (result.shieldRemaining !== undefined && target.permanentShield) {
-                  target.permanentShield.value = result.shieldRemaining;
+              if (result.shieldRemaining !== undefined && newTarget.permanentShield) {
+                  newTarget.permanentShield.value = result.shieldRemaining;
+                  // If shield reaches 0, remove it so it can be re-cast
+                  if (newTarget.permanentShield.value <= 0) {
+                      newTarget.permanentShield = null;
+                  }
               }
+              
+              newPlayers[targetId] = newTarget;
           }
 
           if (pending.type === 'VORTEX_ATTACK' && pending.attackerId === 'PLAYER') {
+               // Ensure we are working with a copy of PLAYER if we haven't already cloned it
+               if (newPlayers.PLAYER === prev.players.PLAYER) {
+                   newPlayers.PLAYER = { ...prev.players.PLAYER };
+               }
                newPlayers.PLAYER.vortexAttacksPerformed += 1;
           }
           return {
@@ -422,6 +482,7 @@ const App: React.FC = () => {
                      usedAbilitiesThisTurn: [],
                      attacksPerformed: 0,
                      vortexAttacksPerformed: 0,
+                     vortexDefensesPerformed: 0, // RESET defense limit counter
                      levelUpsPerformed: 0,
                      abilitiesDrawnThisTurn: 0,
                      isHandRevealed: false // Reset Magic Vision effect
@@ -612,7 +673,7 @@ const App: React.FC = () => {
     };
 
     handleState();
-  }, [gameState.fsmState, gameState.gameStatus, gameState.currentPlayer, gameState.players.AI.powerHand.length]);
+  }, [gameState.fsmState, gameState.gameStatus, gameState.currentPlayer, gameState.players.AI.powerHand.length, gameState.players.AI.activeAbilities.length]);
 
 
   // --- USER INTERACTION HANDLERS (Card Clicks) ---
@@ -714,10 +775,6 @@ const App: React.FC = () => {
         return;
     }
 
-    // ... (Active Abilities Logic: Wall, Heal, Mind, Mod) ...
-    // Note: Collapsed active ability discard handlers for brevity, logic remains same as previous but needs context.
-    // I will include them fully to ensure file integrity.
-    
     // ACTIVE ABILITY: MAGIC WALL
     if (fsmState === FsmState.SELECT_DISCARD_FOR_WALL && owner === 'PLAYER') {
         const ability = pendingAction.targetAbility;
@@ -848,13 +905,17 @@ const App: React.FC = () => {
             } else if (ability.effectTag === 'MAGIC_CONTROL') {
                 modCard.type = modCard.type === 'ATK' ? 'DEF' : 'ATK';
                 logMsg = `${modCard.type}`;
-            } else if (ability.effectTag === 'MASTER_CONTROL') {
+            } 
+            // DISABLED: Master Control Logic
+            /*
+            else if (ability.effectTag === 'MASTER_CONTROL') {
                 if (modCard.color === 'BLACK' && modCard.type === 'ATK') { modCard.color = 'WHITE'; }
                 else if (modCard.color === 'WHITE' && modCard.type === 'ATK') { modCard.type = 'DEF'; }
                 else if (modCard.color === 'WHITE' && modCard.type === 'DEF') { modCard.color = 'BLACK'; }
                 else { modCard.type = 'ATK'; }
                 logMsg = `${modCard.value} ${modCard.color} ${modCard.type}`;
             }
+            */
             player.powerHand[handIndex] = modCard;
             return {
                 ...prev, players: { ...prev.players, PLAYER: player }, fsmState: FsmState.MAIN_PHASE,
@@ -890,10 +951,27 @@ const App: React.FC = () => {
     if (fsmState === FsmState.AWAITING_PLAYER_DEFENSE && owner === 'VORTEX') {
         const hasVortexControl = players.PLAYER.activeAbilities.some(a => a.effectTag === 'VORTEX_CONTROL');
         if (!hasVortexControl) return;
+        
+        // CHECK VORTEX DEFENSE LIMIT
+        if (players.PLAYER.vortexDefensesPerformed >= 1) {
+            alert(txt.warnings?.vortexLimit || "Vortex Defense limit reached.");
+            return;
+        }
+
         if (index === undefined) return;
-        setGameState(prev => ({
-            ...prev, pendingAction: { ...prev.pendingAction, defendingCard: null, vortexDefenseIndex: index }
-        }));
+        
+        // IMMEDIATE ACTION: Update state, increment counter, move to resolution
+        setGameState(prev => {
+            const newPlayer = { ...prev.players.PLAYER };
+            newPlayer.vortexDefensesPerformed += 1;
+            return {
+                ...prev, 
+                players: { ...prev.players, PLAYER: newPlayer },
+                pendingAction: { ...prev.pendingAction, defendingCard: null, vortexDefenseIndex: index },
+                fsmState: FsmState.RESOLVE_DIRECT_COMBAT
+            };
+        });
+        setTimeout(resolveCombat, 500);
     }
   };
 
@@ -952,7 +1030,8 @@ const App: React.FC = () => {
           if (currentShield > 0) { alert(txt.warnings?.shieldActive); return; }
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_WALL, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
-      else if (['MAGIC_AFFINITY', 'LIGHT_AFFINITY', 'DARK_AFFINITY', 'MASTER_AFFINITY'].includes(ability.effectTag)) {
+      else if (['LIGHT_AFFINITY', 'DARK_AFFINITY', 'MASTER_AFFINITY'].includes(ability.effectTag)) {
+          // DISABLED: 'MAGIC_AFFINITY' removed from check above
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_HEAL, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
       else if (ability.effectTag === 'MAGIC_VISION') {
@@ -961,7 +1040,8 @@ const App: React.FC = () => {
       else if (ability.effectTag === 'MIND_CONTROL') {
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_MIND, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
-      else if (['ELEMENTAL_CONTROL', 'MAGIC_CONTROL', 'MASTER_CONTROL'].includes(ability.effectTag)) {
+      else if (['ELEMENTAL_CONTROL', 'MAGIC_CONTROL'].includes(ability.effectTag)) {
+          // DISABLED: 'MASTER_CONTROL' removed from check above
           setGameState(prev => ({ ...prev, fsmState: FsmState.SELECT_DISCARD_FOR_MODIFICATION, pendingAction: { ...prev.pendingAction, targetAbility: ability }, gameLog: addLog(prev, txt.logs.activating(abTrans.name)) }));
       }
   };
@@ -1055,6 +1135,9 @@ const App: React.FC = () => {
           
           newPlayer.level += 1;
           newPlayer.levelUpsPerformed += 1;
+          
+          // Fix logic: Ensure maxHandSize is consistent. If MAGIC_KNOWLEDGE is present, hand size increases by 1 per level.
+          // Since we just leveled up, we add 1.
           if (newPlayer.activeAbilities.some(a => a.effectTag === 'MAGIC_KNOWLEDGE')) { newPlayer.maxHandSize += 1; }
 
           return {
@@ -1072,6 +1155,38 @@ const App: React.FC = () => {
   const handleCancelLevelUp = () => {
       setSelectedCardsForLevelUp([]);
       setGameState(prev => ({ ...prev, fsmState: FsmState.MAIN_PHASE }));
+  };
+
+  // --- HANDLER: CANCEL ACTION ---
+  const handleCancel = () => {
+      setGameState(prev => {
+          let newLogs = [...prev.gameLog];
+          
+          // Check for Ability Cancellation
+          if (prev.pendingAction.targetAbility) {
+              const abInfo = getTransAbility(prev.pendingAction.targetAbility.effectTag, language);
+              newLogs.push(txt.logs.actionCancelled(abInfo.name));
+          } 
+          // Check for other cancellations (Optional but good UX)
+          else if (prev.fsmState === FsmState.SELECT_ATTACK_CARD) {
+              newLogs.push(txt.logs.actionCancelled(txt.ui.attackDirect));
+          }
+          else if (prev.fsmState === FsmState.SELECT_DISCARD_GENERIC) {
+              newLogs.push(txt.logs.actionCancelled(txt.ui.discard));
+          }
+          else if (prev.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW) {
+              newLogs.push(txt.logs.actionCancelled(txt.ui.drawAbility));
+          }
+
+          return {
+              ...prev, 
+              fsmState: FsmState.MAIN_PHASE,
+              pendingAction: { ...prev.pendingAction, targetAbility: null, attackingCard: null },
+              gameLog: newLogs
+          };
+      });
+      setActiveCardId(null);
+      if (highlightedAbilityId) setHighlightedAbilityId(null);
   };
 
   // --- HANDLER: CONFIRMATION ACTIONS ---
@@ -1110,7 +1225,20 @@ const App: React.FC = () => {
       }
 
       if (action === 'DEFEND_WITH_CARD') {
-          setGameState(prev => ({ ...prev, fsmState: FsmState.RESOLVE_DIRECT_COMBAT }));
+          if (gameState.pendingAction.vortexDefenseIndex !== null) {
+              // Increment Defense counter
+              setGameState(prev => {
+                  const newPlayer = { ...prev.players.PLAYER };
+                  newPlayer.vortexDefensesPerformed += 1;
+                  return {
+                      ...prev,
+                      players: { ...prev.players, PLAYER: newPlayer },
+                      fsmState: FsmState.RESOLVE_DIRECT_COMBAT
+                  };
+              });
+          } else {
+             setGameState(prev => ({ ...prev, fsmState: FsmState.RESOLVE_DIRECT_COMBAT }));
+          }
           setTimeout(resolveCombat, 500);
       }
 
@@ -1147,73 +1275,141 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {showRulesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+             <div className="bg-slate-800 border border-yellow-500 rounded-xl p-6 max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <button onClick={() => setShowRulesModal(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
+                <h3 className="text-2xl font-cinzel text-yellow-400 mb-4 border-b border-yellow-900/50 pb-2">{txt.rules.title}</h3>
+                
+                <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.goal.title}</h4>
+                        <p>{txt.rules.goal.text}</p>
+                    </section>
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.cards.title}</h4>
+                        <p>{txt.rules.cards.text}</p>
+                    </section>
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.combat.title}</h4>
+                        <p>{txt.rules.combat.text}</p>
+                    </section>
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.vortex.title}</h4>
+                        <p>{txt.rules.vortex.text}</p>
+                    </section>
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.leveling.title}</h4>
+                        <p>{txt.rules.leveling.text}</p>
+                    </section>
+                    <section>
+                        <h4 className="text-yellow-200 font-bold uppercase text-xs mb-1">{txt.rules.abilities.title}</h4>
+                        <p>{txt.rules.abilities.text}</p>
+                    </section>
+                </div>
+                
+                <div className="mt-6 text-center"><button onClick={() => setShowRulesModal(false)} className="px-4 py-2 bg-yellow-900 hover:bg-yellow-800 text-yellow-100 rounded border border-yellow-500">{ui.closeRules}</button></div>
+            </div>
+        </div>
+      )}
+
       {showAbilityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 overflow-y-auto">
-             <div className="bg-slate-900 border-2 border-indigo-600 rounded-xl p-6 max-w-4xl w-full shadow-2xl relative my-8 h-[80vh] overflow-hidden flex flex-col">
+             <div className="bg-slate-900 border-2 border-indigo-600 rounded-xl p-6 max-w-5xl w-full shadow-2xl relative my-8 h-[80vh] overflow-hidden flex flex-col">
                 <button onClick={() => setShowAbilityModal(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
                 <h3 className="text-3xl font-cinzel text-indigo-400 mb-4 text-center border-b border-indigo-900 pb-2 shrink-0">{ui.abilityGuide}</h3>
                 
-                <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-indigo-900">
                     {/* Neutral */}
                     <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                        <h4 className="text-slate-200 font-bold mb-3 uppercase tracking-wider border-b border-slate-600 pb-1">{txt.abilityDefinitions.neutral.title}</h4>
-                        <ul className="space-y-2 text-sm text-slate-300">
-                            {txt.abilityDefinitions.neutral.list.map((desc, i) => <li key={i}>• {desc}</li>)}
-                        </ul>
+                        <h4 className="text-slate-200 font-bold mb-4 uppercase tracking-wider border-b border-slate-600 pb-1 text-center">{txt.abilityDefinitions.neutral.title}</h4>
+                        <div className="space-y-6">
+                            {[1, 2, 3].map(lvl => {
+                                // @ts-ignore
+                                const items = txt.abilityDefinitions.neutral.levels[lvl];
+                                if (!items) return null;
+                                return (
+                                    <div key={lvl}>
+                                        <h5 className="text-xs text-slate-500 uppercase font-bold mb-2 ml-1">Level {lvl}</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {/* @ts-ignore */}
+                                            {items.map((ability: any, i: number) => (
+                                                <div key={i} className="bg-slate-900 border border-slate-600 rounded-lg p-3 flex flex-col gap-2 hover:bg-slate-800 transition-colors">
+                                                    <div className="flex items-center gap-2 border-b border-slate-700 pb-1">
+                                                        <span className="text-2xl">{ability.icon}</span>
+                                                        <span className="font-bold text-slate-200 text-sm">{ability.name}</span>
+                                                        <span className="text-[10px] bg-slate-700 px-1.5 rounded text-slate-300 ml-auto uppercase">{ability.type}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 leading-relaxed">{ability.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                     {/* White */}
                     <div className="bg-slate-800/50 p-4 rounded-lg border border-yellow-200/20">
-                        <h4 className="text-yellow-200 font-bold mb-3 uppercase tracking-wider border-b border-yellow-900/30 pb-1">{txt.abilityDefinitions.white.title}</h4>
-                        <ul className="space-y-2 text-sm text-yellow-100/80">
-                            {txt.abilityDefinitions.white.list.map((desc, i) => <li key={i}>• {desc}</li>)}
-                        </ul>
+                        <h4 className="text-yellow-200 font-bold mb-4 uppercase tracking-wider border-b border-yellow-900/30 pb-1 text-center">{txt.abilityDefinitions.white.title}</h4>
+                        <div className="space-y-6">
+                            {[1, 2, 3].map(lvl => {
+                                // @ts-ignore
+                                const items = txt.abilityDefinitions.white.levels[lvl];
+                                if (!items) return null;
+                                return (
+                                    <div key={lvl}>
+                                        <h5 className="text-xs text-yellow-500/50 uppercase font-bold mb-2 ml-1">Level {lvl}</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {/* @ts-ignore */}
+                                            {items.map((ability: any, i: number) => (
+                                                <div key={i} className="bg-slate-900 border border-yellow-900/40 rounded-lg p-3 flex flex-col gap-2 hover:bg-yellow-900/10 transition-colors">
+                                                    <div className="flex items-center gap-2 border-b border-yellow-900/30 pb-1">
+                                                        <span className="text-2xl">{ability.icon}</span>
+                                                        <span className="font-bold text-yellow-100 text-sm">{ability.name}</span>
+                                                        <span className="text-[10px] bg-yellow-900/30 px-1.5 rounded text-yellow-200 ml-auto uppercase">{ability.type}</span>
+                                                    </div>
+                                                    <p className="text-xs text-yellow-100/70 leading-relaxed">{ability.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                     {/* Black */}
                     <div className="bg-slate-800/50 p-4 rounded-lg border border-purple-900/50">
-                        <h4 className="text-purple-400 font-bold mb-3 uppercase tracking-wider border-b border-purple-900/30 pb-1">{txt.abilityDefinitions.black.title}</h4>
-                        <ul className="space-y-2 text-sm text-purple-300/80">
-                            {txt.abilityDefinitions.black.list.map((desc, i) => <li key={i}>• {desc}</li>)}
-                        </ul>
+                        <h4 className="text-purple-400 font-bold mb-4 uppercase tracking-wider border-b border-purple-900/30 pb-1 text-center">{txt.abilityDefinitions.black.title}</h4>
+                         <div className="space-y-6">
+                            {[1, 2, 3].map(lvl => {
+                                // @ts-ignore
+                                const items = txt.abilityDefinitions.black.levels[lvl];
+                                if (!items) return null;
+                                return (
+                                    <div key={lvl}>
+                                        <h5 className="text-xs text-purple-500/50 uppercase font-bold mb-2 ml-1">Level {lvl}</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {/* @ts-ignore */}
+                                            {items.map((ability: any, i: number) => (
+                                                <div key={i} className="bg-slate-900 border border-purple-900/40 rounded-lg p-3 flex flex-col gap-2 hover:bg-purple-900/10 transition-colors">
+                                                    <div className="flex items-center gap-2 border-b border-purple-900/30 pb-1">
+                                                        <span className="text-2xl">{ability.icon}</span>
+                                                        <span className="font-bold text-purple-200 text-sm">{ability.name}</span>
+                                                        <span className="text-[10px] bg-purple-900/30 px-1.5 rounded text-purple-300 ml-auto uppercase">{ability.type}</span>
+                                                    </div>
+                                                    <p className="text-xs text-purple-200/70 leading-relaxed">{ability.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
                 <div className="mt-4 text-center shrink-0"><button onClick={() => setShowAbilityModal(false)} className="px-6 py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 rounded border border-indigo-500 font-bold">{ui.closeGuide}</button></div>
-            </div>
-        </div>
-      )}
-      
-      {showRulesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 overflow-y-auto">
-             <div className="bg-slate-900 border-2 border-yellow-600 rounded-xl p-6 max-w-3xl w-full shadow-2xl relative my-8">
-                <button onClick={() => setShowRulesModal(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
-                <h3 className="text-3xl font-cinzel text-yellow-500 mb-6 text-center border-b border-yellow-900 pb-2">{txt.rules.title}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-300 text-sm leading-relaxed">
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.goal.title}</h4>
-                        <p>{txt.rules.goal.text}</p>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.cards.title}</h4>
-                        <p>{txt.rules.cards.text}</p>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.combat.title}</h4>
-                        <p>{txt.rules.combat.text}</p>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.vortex.title}</h4>
-                        <p>{txt.rules.vortex.text}</p>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.leveling.title}</h4>
-                        <p>{txt.rules.leveling.text}</p>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                        <h4 className="text-yellow-400 font-bold mb-1 uppercase">{txt.rules.abilities.title}</h4>
-                        <p>{txt.rules.abilities.text}</p>
-                    </div>
-                </div>
-                <div className="mt-6 text-center"><button onClick={() => setShowRulesModal(false)} className="px-6 py-2 bg-yellow-700 hover:bg-yellow-600 text-white rounded border border-yellow-500 font-bold">{ui.closeRules}</button></div>
             </div>
         </div>
       )}
@@ -1234,7 +1430,7 @@ const App: React.FC = () => {
                 {/* Lore Section */}
                 <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 w-full mb-4">
                     <h4 className="text-purple-400 text-xs font-bold uppercase mb-2 border-b border-purple-900/30 pb-1">Lore</h4>
-                    <p className="text-slate-300 text-sm leading-relaxed font-serif italic text-justify">{/* @ts-ignore */ txt.characterLore[viewingCharacter.id]}</p>
+                    <p className="text-slate-300 text-sm leading-relaxed font-serif italic text-justify">{txt.characterLore[viewingCharacter.id]}</p>
                 </div>
                 
                 {/* Ability Section */}
@@ -1244,10 +1440,17 @@ const App: React.FC = () => {
                          const ability = getAbilityByTag(viewingCharacter.startingAbilityTag);
                          if (!ability) return null;
                          const trans = getTransAbility(ability.effectTag, language);
+                         const fullDesc = findFullAbilityDescription(ability.effectTag);
+
                          return (
                              <div>
-                                 <div className="text-indigo-200 font-bold text-sm">{trans.name}</div>
-                                 <div className="text-indigo-300/80 text-xs mt-1">{trans.desc}</div>
+                                 <div className="text-indigo-200 font-bold text-sm flex items-center gap-2">
+                                    <span className="text-lg">{ability.icon}</span>
+                                    {trans.name}
+                                 </div>
+                                 <div className="text-indigo-300/80 text-xs mt-2 leading-relaxed italic border-l-2 border-indigo-500 pl-2">
+                                     {fullDesc}
+                                 </div>
                              </div>
                          )
                      })()}
@@ -1309,7 +1512,8 @@ const App: React.FC = () => {
                                         <div className={`text-[10px] font-bold px-2 py-0.5 rounded w-full text-center uppercase tracking-wider ${char.affinityColor === 'WHITE' ? 'bg-slate-200 text-slate-800' : char.affinityColor === 'BLACK' ? 'bg-black text-slate-200' : 'bg-slate-600 text-slate-300'}`}>
                                             {char.affinityColor}
                                         </div>
-                                        <div className="text-[9px] bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded w-full text-center border border-indigo-500/30 truncate">
+                                        <div className="text-[9px] bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded w-full text-center border border-indigo-500/30 truncate flex items-center justify-center gap-1">
+                                            {ability && <span>{ability.icon}</span>}
                                             {abName}
                                         </div>
                                     </div>
@@ -1322,9 +1526,30 @@ const App: React.FC = () => {
             
             {gameState.gameStatus === 'GAME_OVER' && (
                  <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-xl border border-slate-700 relative z-20">
-                    <div className="text-center p-8 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-500 shadow-2xl">
-                        <h2 className={`text-5xl font-cinzel mb-4 ${gameState.winner === 'PLAYER' ? 'text-yellow-400' : 'text-red-500'}`}>{gameState.winner === 'PLAYER' ? ui.victory : ui.defeat}</h2>
-                        <button onClick={startGame} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg border-2 border-slate-400">{ui.playAgain}</button>
+                    <div className="flex flex-col items-center p-8 bg-slate-900/90 backdrop-blur-xl rounded-xl border-2 border-slate-500 shadow-2xl relative z-50 w-full max-w-[95vw]">
+                        {/* Character Result Image */}
+                        {gameState.players.PLAYER.character && (
+                            <div className="mb-8 relative flex justify-center">
+                                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[50vw] blur-3xl opacity-40 rounded-full pointer-events-none ${gameState.winner === 'PLAYER' ? 'bg-yellow-400' : 'bg-red-600'}`}></div>
+                                <img 
+                                    src={`/images/${gameState.players.PLAYER.character.id}_${gameState.winner === 'PLAYER' ? 'victory' : 'defeat'}.png`} 
+                                    alt={gameState.winner === 'PLAYER' ? "Victory" : "Defeat"}
+                                    className="relative w-[50vw] h-auto object-contain drop-shadow-2xl z-10"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                            </div>
+                        )}
+                        <h2 className={`text-6xl font-cinzel mb-8 font-bold tracking-wider drop-shadow-md ${gameState.winner === 'PLAYER' ? 'text-yellow-400' : 'text-red-500'}`}>
+                            {gameState.winner === 'PLAYER' ? ui.victory : ui.defeat}
+                        </h2>
+                        <button 
+                            onClick={startGame} 
+                            className="bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white font-bold py-4 px-12 rounded-lg shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-slate-400 transition-all hover:scale-105 active:scale-95 uppercase tracking-widest text-lg cursor-pointer"
+                        >
+                            {ui.playAgain}
+                        </button>
                     </div>
                  </div>
             )}
@@ -1455,8 +1680,17 @@ const App: React.FC = () => {
                         )}
                         
                         {/* Cancel button */}
-                        {(gameState.fsmState === FsmState.SELECT_ATTACK_CARD || gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW || gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC || gameState.fsmState === FsmState.SELECT_DISCARD_FOR_VISION) && (
-                            <button onClick={() => setGameState(prev => ({...prev, fsmState: FsmState.MAIN_PHASE}))} className="flex-1 min-w-[120px] px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
+                        {(
+                            gameState.fsmState === FsmState.SELECT_ATTACK_CARD || 
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_DRAW || 
+                            gameState.fsmState === FsmState.SELECT_DISCARD_GENERIC || 
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_VISION || 
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_WALL ||
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_HEAL ||
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_MIND ||
+                            gameState.fsmState === FsmState.SELECT_DISCARD_FOR_MODIFICATION
+                        ) && (
+                            <button onClick={handleCancel} className="flex-1 min-w-[120px] px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-bold">{ui.cancel}</button>
                         )}
 
                         {gameState.fsmState === FsmState.AWAITING_PLAYER_DEFENSE && (
@@ -1495,5 +1729,3 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;

@@ -55,8 +55,8 @@ const EndGameEffects: React.FC<EndGameEffectsProps> = ({ outcome }) => {
           className="absolute top-0 rounded-sm"
           style={{
             left: p.left,
-            width: outcome === 'VICTORY' ? '10px' : '4px',
-            height: outcome === 'VICTORY' ? '10px' : '12px',
+            width: outcome === 'VICTORY' ? '10px' : '8px', // Doubled from 4px
+            height: outcome === 'VICTORY' ? '10px' : '24px', // Doubled from 12px
             backgroundColor: p.color,
             borderRadius: outcome === 'VICTORY' ? '0' : '50% 50% 50% 50% / 60% 60% 40% 40%', // Tear shape for blood
             animation: `${outcome === 'VICTORY' ? 'fall-confetti' : 'fall-blood'} ${p.duration} linear ${p.delay} infinite`

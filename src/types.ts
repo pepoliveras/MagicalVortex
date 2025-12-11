@@ -1,5 +1,4 @@
 
-
 /**
  * TYPE DEFINITIONS
  * This file contains all the interfaces and types used to manage the global game state.
@@ -66,6 +65,7 @@ export interface Card {
 export interface AbilityCard {
   id: string;
   name: string;
+  icon: string; // Visual icon for UI
   level: number;
   description: string;
   effectTag: string; // Used for logic identification (e.g., 'MAGIC_WALL')
@@ -99,6 +99,7 @@ export interface Player {
   usedAbilitiesThisTurn: string[]; // IDs of abilities used (to prevent spam)
   attacksPerformed: number; // Max 2 per turn
   vortexAttacksPerformed: number; // Max 1 per turn (unless Master Vortex)
+  vortexDefensesPerformed: number; // NEW: Max 1 per turn
   levelUpsPerformed: number; // Max 1 per turn
   abilitiesDrawnThisTurn: number; // Max 1 per turn
 }
