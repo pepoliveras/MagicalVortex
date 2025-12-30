@@ -1,4 +1,3 @@
-
 import { FsmState } from './types';
 import type { Card, AbilityCard, GameState, Character } from './types';
 
@@ -104,8 +103,8 @@ export const generateAbilityDeck = (): AbilityCard[] => {
     return shuffle(deck);
 };
 
-// Fisher-Yates Shuffle Algorithm
-export const shuffle = <T,>(array: T[]): T[] => {
+// Fisher-Yates Shuffle Algorithm - Safer TS generic syntax
+export const shuffle = <T extends unknown>(array: T[]): T[] => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

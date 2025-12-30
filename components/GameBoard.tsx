@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { FsmState } from '../types';
 import type { Player, Card, AbilityCard, PendingAction, Character, Language } from '../types';
 import CardComponent from './CardComponent';
-// FIX: Strictly relative import
+import StatBox from './StatBox';
 import { TEXTS, getTransAbility } from '../translations';
 
 interface GameBoardProps {
@@ -24,62 +24,6 @@ interface GameBoardProps {
   highlightedAbilityId?: string | null; 
   round: number; 
 }
-
-// --- SUB-COMPONENTS ---
-
-// 1. STAT BOX (Generic Container for a single stat)
-const StatBox = ({ 
-    label, 
-    value, 
-    subValue, 
-    icon, 
-    colorClass, 
-    bgClass = "bg-slate-900", 
-    size = "sm",
-    isLife = false
-}: { 
-    label: string, 
-    value: string | number, 
-    subValue?: string, 
-    icon?: string, 
-    colorClass: string,
-    bgClass?: string,
-    size?: "sm" | "md" | "lg",
-    isLife?: boolean
-}) => {
-    // Flash effect for value changes
-    const [isFlashing, setIsFlashing] = useState(false);
-    const prevValue = useRef<number | string>(value);
-
-    useEffect(() => {
-        if (typeof value === 'number' && typeof prevValue.current === 'number') {
-            if (value < prevValue.current) {
-                setIsFlashing(true);
-                const timer = setTimeout(() => setIsFlashing(false), 500);
-                return () => clearTimeout(timer);
-            }
-        }
-        prevValue.current = value;
-    }, [value]);
-
-    const flashClass = isFlashing ? "ring-2 ring-red-500 bg-red-900/50 scale-105" : "";
-    const heightClass = isLife ? "h-24 sm:h-28" : "h-12 sm:h-14";
-    const textClass = isLife ? "text-5xl font-bold tracking-tighter" : "text-xl font-bold";
-
-    return (
-        <div className={`
-            ${bgClass} ${heightClass} rounded-lg border ${colorClass} ${flashClass}
-            flex flex-col items-center justify-center relative transition-all duration-300 overflow-hidden px-1
-        `}>
-            <span className="text-[9px] uppercase text-slate-400 font-bold absolute top-1 left-0 right-0 text-center">{label}</span>
-            <div className="flex items-center justify-center gap-1 mt-3 w-full">
-                {icon && <span className="text-lg">{icon}</span>}
-                <span className={`${textClass} leading-none`}>{value}</span>
-                {subValue && <span className="text-xs text-slate-500 self-end mb-1">/{subValue}</span>}
-            </div>
-        </div>
-    );
-};
 
 // 2. ABILITY BADGE (Pill shape for active abilities)
 const AbilityBadge: React.FC<{ ability: AbilityCard, onClick?: () => void, language: Language, isAi?: boolean }> = ({ ability, onClick, language, isAi }) => {
@@ -129,29 +73,23 @@ const StatsPanel: React.FC<{
     onActiveAbilityClick: (a: AbilityCard) => void
 }> = ({ player, isAi, maxAbilities, txt, language, onActiveAbilityClick }) => {
     
-    // --- CALCULATE MODIFIERS (Variables) ---
-    // These are derived from active abilities
     const modWhiteAtk = player.activeAbilities.some(a => a.effectTag === 'PALADIN_OF_LIGHT') ? `+${player.level}` : '+0';
     const modWhiteDef = player.activeAbilities.some(a => a.effectTag === 'LIGHT_DEFENSE') ? `+${player.level}` : '+0';
     const modBlackAtk = player.activeAbilities.some(a => a.effectTag === 'DARK_LORD') ? `+${player.level}` : '+0';
     const modBlackDef = player.activeAbilities.some(a => a.effectTag === 'DARK_DEFENSE') ? `+${player.level}` : '+0';
 
-    // Localized label for Cards since it's not in the main translation object yet
     const cardLabel = language === 'ca' ? 'MÀX CARTES' : language === 'es' ? 'MÁX CARTAS' : 'MAX CARDS';
 
     return (
         <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
             <div className="flex gap-2 w-full">
-                {/* LEFT COLUMN: LIFE & CARDS */}
                 <div className="flex flex-col gap-2 w-1/3 sm:w-28 shrink-0">
-                    {/* BIG LIFE BOX */}
                     <StatBox 
                         label={txt.life} 
                         value={player.life} 
                         colorClass={isAi ? "border-red-500 text-red-400" : "border-green-500 text-green-400"} 
                         isLife={true}
                     />
-                    {/* MAX CARDS BOX */}
                     <StatBox 
                         label={cardLabel} 
                         value={player.maxHandSize}
@@ -160,14 +98,11 @@ const StatsPanel: React.FC<{
                     />
                 </div>
 
-                {/* RIGHT COLUMN: LEVEL & MODIFIERS (GRID) */}
                 <div className="flex-1 grid grid-cols-2 gap-1.5 h-full">
-                    {/* Row 1: LEVEL (Full Width) */}
                     <div className="col-span-2">
                         <StatBox label={txt.level} value={player.level} colorClass="border-purple-500 text-purple-400" />
                     </div>
 
-                    {/* Row 2: WHITE MODIFIERS (Yellow Theme - No BG, Glow on active) */}
                     <StatBox 
                         label="DEF" 
                         value={modWhiteDef} 
@@ -183,7 +118,6 @@ const StatsPanel: React.FC<{
                         colorClass={modWhiteAtk !== '+0' ? "border-yellow-400 text-yellow-300 shadow-[0_0_10px_rgba(250,204,21,0.3)]" : "border-yellow-900/20 text-yellow-800/30"}
                     />
 
-                    {/* Row 3: BLACK MODIFIERS (Purple Theme - No BG, Glow on active) */}
                     <StatBox 
                         label="DEF" 
                         value={modBlackDef} 
@@ -201,7 +135,6 @@ const StatsPanel: React.FC<{
                 </div>
             </div>
 
-            {/* BOTTOM ROW: Abilities & Attacks (Equal Width) */}
             <div className="flex gap-1.5">
                 <div className="flex-1">
                     <StatBox 
@@ -225,7 +158,6 @@ const StatsPanel: React.FC<{
                 </div>
             </div>
 
-            {/* ACTIVE ABILITIES LIST (Stacked) */}
             <div className="flex flex-col gap-1 mt-1 w-full">
                 {player.permanentShield && (
                     <div className="bg-blue-900/30 border border-blue-500/50 text-blue-200 text-[10px] px-2 py-1 rounded flex justify-between items-center">
@@ -248,7 +180,6 @@ const StatsPanel: React.FC<{
     );
 }
 
-// Card representation for abilities in HAND
 const AbilityCardComponent: React.FC<{ 
     ability: AbilityCard, 
     onClick?: () => void, 
@@ -300,10 +231,6 @@ const CharacterInfo = ({ character, isAi, onClick }: { character: Character | nu
     );
 };
 
-/**
- * GAME BOARD
- * Refactored: Uses StatsPanel for unified layout.
- */
 const GameBoard: React.FC<GameBoardProps> = ({ 
   ai, 
   player, 
@@ -322,21 +249,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
   highlightedAbilityId,
   round
 }) => {
-  // Check Magic Vision: Reveals AI cards if set to true for the turn
   const playerHasVision = player.isHandRevealed;
-  // DEFENSIVE: Fallback to 'en'
   const t = TEXTS[language] || TEXTS['en'];
   if (!t) return null;
   const txt = t.ui;
   
-  // Dynamic Max Abilities calculation
   const charAffinity = player.character?.affinityColor || 'NEUTRAL';
   const maxAbilities = charAffinity === 'NEUTRAL' ? player.level : player.level + 1;
   
   const aiAffinity = ai.character?.affinityColor || 'NEUTRAL';
   const aiMaxAbilities = aiAffinity === 'NEUTRAL' ? ai.level : ai.level + 1;
 
-  // Responsive logic
   const totalPlayerCards = player.powerHand.length + player.abilityHand.length;
   const playerCardSize = totalPlayerCards > 6 ? 'sm' : 'md';
   
@@ -345,7 +268,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <>
-      {/* ROUND INDICATOR - Independent from panels */}
       <div className="flex justify-center w-full">
           <div className="bg-slate-950 px-6 py-1.5 rounded-full border border-orange-700/50 shadow-[0_0_10px_rgba(234,88,12,0.2)] flex items-center gap-3">
                 <span className="text-orange-400 font-bold font-cinzel text-sm">{txt.round} {round}</span>
@@ -354,7 +276,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
           </div>
       </div>
 
-      {/* PANEL 1: OPPONENT (AI) */}
       <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-md p-4 relative mt-4">
         <div className="absolute top-0 left-4 -translate-y-1/2 flex gap-2 z-20">
             <div className="bg-slate-900 px-3 py-0.5 rounded text-red-400 font-bold border border-red-900 text-sm">
@@ -364,19 +285,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
         <CharacterInfo character={ai.character} isAi={true} onClick={onCharacterClick} />
         
-        {/* LAYOUT: Flex Column on Mobile, Row on Desktop */}
         <div className="flex flex-col md:flex-row gap-4 mt-4">
-             {/* AI STATS PANEL */}
              <StatsPanel 
                 player={ai} 
                 isAi={true} 
                 maxAbilities={aiMaxAbilities} 
                 txt={txt} 
                 language={language}
-                onActiveAbilityClick={() => {}} // AI abilities aren't clickable
+                onActiveAbilityClick={() => {}} 
              />
           
-          {/* AI Hand */}
           <div className="flex-1 w-full overflow-hidden flex flex-col justify-center">
             <div className="flex flex-1 w-full justify-center items-center gap-1 sm:gap-2 px-2 py-2">
                 {ai.powerHand.map((card) => {
@@ -409,9 +327,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
         </div>
       </section>
 
-      {/* PANEL 2: THE VORTEX */}
       <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-md p-4 relative flex flex-col items-center justify-center overflow-hidden min-h-[220px]">
-        {/* Ambient Effects */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/10 via-purple-900/10 to-indigo-900/10 pointer-events-none"></div>
         <div className="absolute w-64 h-64 bg-purple-600/5 rounded-full blur-3xl animate-pulse"></div>
 
@@ -419,7 +335,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
             {txt.vortexLabel || "THE VORTEX"}
         </h2>
         
-        {/* Vortex Cards */}
         <div className="flex w-full justify-center items-center gap-2 sm:gap-4 z-10 px-2 sm:px-8">
           {vortexCards.map((card, idx) => {
              const isRevealed = pendingAction.vortexCardIndex === idx || pendingAction.vortexDefenseIndex === idx;
@@ -447,7 +362,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
         </div>
       </section>
 
-      {/* PANEL 3: PLAYER */}
       <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-md p-4 relative mt-4">
         <div className="absolute top-0 left-4 -translate-y-1/2 bg-slate-900 px-3 py-0.5 rounded text-green-400 font-bold border border-green-900 text-sm z-20">
           {txt.player}
@@ -456,7 +370,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
         <div className="flex flex-col md:flex-row gap-4 mt-4">
             
-            {/* PLAYER STATS PANEL */}
             <StatsPanel 
                 player={player} 
                 isAi={false} 
@@ -466,10 +379,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onActiveAbilityClick={onActiveAbilityClick}
              />
 
-            {/* Player Hand */}
             <div className="flex-1 w-full overflow-hidden flex flex-col justify-center">
                 <div className={`flex w-full justify-center items-center gap-1 sm:gap-2 px-2 py-2`}>
-                    {/* Render Ability Cards in Hand */}
                     {player.abilityHand.map((ability) => (
                          <div key={ability.id} className="relative flex-1 max-w-[100px] aspect-[5/7]">
                              <AbilityCardComponent 
@@ -483,7 +394,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                          </div>
                      ))}
 
-                    {/* Render Power Cards */}
                     {player.powerHand.map((card) => {
                         let isDisabled = true;
                         if (fsmState === FsmState.MAIN_PHASE) isDisabled = false;

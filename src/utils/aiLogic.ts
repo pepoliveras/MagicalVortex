@@ -3,57 +3,80 @@ import type { Player, Card, AbilityCard, CardColor } from '../types';
 import { calculateDirectDamage } from './gameLogic';
 
 /**
- * AI LOGIC ENGINE V2.5
+ * AI LOGIC ENGINE V2.6 (Optimized)
  * Handles specific decision making based on Round Difficulty.
  */
 
 /**
  * PHASE 1: LEVEL UP CHECK
- * Round 1: Never levels up.
- * Round 2: Tries to level up if hand allows sum >= 10.
- * Round 3: Tries to level up using Defense cards primarily, keeping Attacks if possible.
+ * Optimization: Solves Subset Sum Problem to find combo closest to 10 without going too high,
+ * or minimizing the loss of high value cards.
  */
 export const getAiLevelUpCards = (hand: Card[], round: number, level: number): Card[] | null => {
     if (round === 1) return null; // Beginner AI never levels up
-    if (level >= round) return null; // Cap level at Round number (1, 2, or 3)
+    if (level >= round) return null; // Cap level at Round number
 
-    // Helper: Find subset that sums >= 10
-    const findSum = (cards: Card[]): Card[] | null => {
-        // Simple greedy approach: Sort Descending
-        const sorted = [...cards].sort((a, b) => b.value - a.value);
-        let sum = 0;
-        const selection: Card[] = [];
+    // Helper: Find exact subset sum >= 10 with minimum card count or minimum value overflow
+    const findOptimalSubset = (cards: Card[]): Card[] | null => {
+        // Filter out cards effectively to avoid complexity, though for hand size 5 it's negligible.
+        // We want a combination that sums >= 10.
         
-        for (const c of sorted) {
-            selection.push(c);
-            sum += c.value;
-            if (sum >= 10) return selection;
+        let bestCombination: Card[] | null = null;
+        let minSum = 999;
+
+        // Power Set approach (2^N) is fine for N=5 to 7 cards.
+        const totalSubsets = 1 << cards.length;
+        for (let i = 0; i < totalSubsets; i++) {
+            const currentSubset: Card[] = [];
+            let currentSum = 0;
+
+            for (let j = 0; j < cards.length; j++) {
+                if ((i & (1 << j)) !== 0) {
+                    currentSubset.push(cards[j]);
+                    currentSum += cards[j].value;
+                }
+            }
+
+            if (currentSum >= 10) {
+                // Criteria: prefer sums closer to 10 (less waste)
+                if (currentSum < minSum) {
+                    minSum = currentSum;
+                    bestCombination = currentSubset;
+                } else if (currentSum === minSum) {
+                    // Tie-breaker: prefer discarding FEWER cards (keep hand size)
+                    // OR prefer discarding MORE cards (cycle deck)? 
+                    // Let's prefer discarding FEWER high value cards -> smaller length usually means higher values, wait.
+                    // Actually, we want to discard worst cards. 
+                    // Simple logic: Minimize sum is usually best.
+                    if (bestCombination && currentSubset.length > bestCombination.length) {
+                         // If sums are equal, discard the one with MORE cards (get rid of junk)
+                         bestCombination = currentSubset;
+                    }
+                }
+            }
         }
-        return null;
+        return bestCombination;
     };
 
     if (round === 2) {
-        // Intermediate: Just level up if possible with any cards
-        return findSum(hand);
+        // Intermediate: Just level up if possible
+        return findOptimalSubset(hand);
     }
 
     if (round === 3) {
-        // Advanced: Try to level up without spending strong ATK cards if possible
-        const defCards = hand.filter(c => c.type === 'DEF');
-        const pureDefSum = findSum(defCards);
-        if (pureDefSum) return pureDefSum;
-
-        // If not possible with just DEF, try keeping at least 1 high ATK card
-        const atkCards = hand.filter(c => c.type === 'ATK').sort((a,b) => b.value - a.value);
+        // Advanced: Try to avoid using the single best Attack card
+        const atkCards = hand.filter(c => c.type === 'ATK').sort((a, b) => b.value - a.value);
+        
         if (atkCards.length > 0) {
-            const bestAtk = atkCards[0];
-            const others = hand.filter(c => c.id !== bestAtk.id);
-            const mixSum = findSum(others);
-            if (mixSum) return mixSum;
+            const bestAtkId = atkCards[0].id;
+            const handWithoutBest = hand.filter(c => c.id !== bestAtkId);
+            const optimalWithoutBest = findOptimalSubset(handWithoutBest);
+            
+            if (optimalWithoutBest) return optimalWithoutBest;
         }
         
-        // Desperation: Level up anyway if possible
-        return findSum(hand);
+        // If we can't save the best card, just level up normally
+        return findOptimalSubset(hand);
     }
 
     return null;
@@ -88,19 +111,14 @@ export const getAiAttackCard = (hand: Card[], round: number, attacksPerformed: n
     }
 
     // Advanced logic: Optimization sequence
-    // If AI can do N attacks, it selects the best N cards.
-    // Then plays them starting from the weakest of that set.
     const attacksRemaining = maxAttacks - attacksPerformed;
     if (attacksRemaining <= 0) return null;
 
-    // Determine the 'plan' based on current hand.
-    // Assuming AI re-evaluates the "Best Set" every turn based on current hand state.
-    
     // Take the best 'attacksRemaining' cards.
     const bestSet = atkCards.slice(0, attacksRemaining);
     
     // Play the lowest value from this best set to bait defense
-    const cardToPlay = bestSet[bestSet.length - 1]; // Last item is the smallest of the top set
+    const cardToPlay = bestSet[bestSet.length - 1]; 
     return cardToPlay;
 };
 
@@ -125,27 +143,19 @@ export const getAiDefenseCard = (
         return defCards.sort((a, b) => b.value - a.value)[0];
     }
 
-    // Intermediate: Smart Match (Close to attack value, Opposite Color preferred)
+    // Intermediate: Smart Match
     if (round === 2) {
         const attackVal = attackCard.value;
         const oppositeColor = attackCard.color === 'BLACK' ? 'WHITE' : 'BLACK';
-        
-        // Sort by how efficient they are.
-        // We want Def >= Atk (Opposite) or Floor(Def/2) >= Atk (Same)
-        // Score: Lower 'waste' is better.
         
         const scored = defCards.map(c => {
             let effectiveness = c.value;
             if (c.color !== oppositeColor) effectiveness = Math.floor(c.value / 2);
             
-            // Waste = Effectiveness - AttackVal. We want >= 0.
             const waste = effectiveness - attackVal;
             
-            // Penalty for failing to block
-            if (waste < 0) return { card: c, score: -1000 + waste }; // Negative score for taking damage
-            
-            // Penalty for Overkill (wasting a high card on low attack)
-            return { card: c, score: -waste }; // Closer to 0 is better
+            if (waste < 0) return { card: c, score: -1000 + waste }; 
+            return { card: c, score: -waste }; 
         });
 
         scored.sort((a, b) => b.score - a.score);
@@ -156,31 +166,27 @@ export const getAiDefenseCard = (
     if (round === 3) {
         let bestCard: Card | null = null;
         let minDamage = 999;
-        let bestValue = 999; // Tiebreaker: use cheapest card
+        let bestValue = 999;
 
         for (const card of defCards) {
-            // Simulate damage
             const result = calculateDirectDamage(attackCard, card, attacker, defender);
-            // Check if damage targets defender (Player ID or AI ID)
-            // If result.targetId is AI, it's damage taken. If NULL, it's 0. If PLAYER, it's reflected (Good!)
             let dmgTaken = 0;
             if (result.targetId === defender.id) dmgTaken = result.damage;
-            if (result.targetId === attacker.id) dmgTaken = -result.damage; // Bonus for reflecting!
+            if (result.targetId === attacker.id) dmgTaken = -result.damage;
 
             if (dmgTaken < minDamage) {
                 minDamage = dmgTaken;
                 bestCard = card;
                 bestValue = card.value;
             } else if (dmgTaken === minDamage) {
-                // Save resources: use lower value card for same result
                 if (card.value < bestValue) {
                     bestCard = card;
                     bestValue = card.value;
                 }
             }
         }
-        return bestCard || defCards[0]; // Fallback to first available if simulation logic fails to find 'better'
+        return bestCard || defCards[0]; 
     }
 
-    return defCards[0]; // Fallback
+    return defCards[0];
 };
